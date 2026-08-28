@@ -26,10 +26,7 @@ tools
 
 ## 功能
 
-### 节点 / 服务
 
-- V2Node 多节点管理：查看、添加、删除节点，安全修改 `/etc/v2node/config.json` 并重启服务。
-- AppleID 后端管理：安装、升级、状态和日志；默认 API URL 为 `https://id.8babao.com`，目录为 `/root/appleid`。
 
 ### 网络工具
 
