@@ -104,6 +104,7 @@ backup_file() {
     [[ -e "$file" ]] || return 0
     stamp="$(date '+%Y%m%d-%H%M%S')"
     mkdir -p "$backup_dir"
+    chmod 700 "$backup_dir"
     cp -a -- "$file" "$backup_dir/$(basename "$file").$stamp.bak"
     info "已备份 $file"
 }
@@ -147,6 +148,31 @@ detect_default_interface() {
     if [[ "$family" == "4" ]]; then probe="1.1.1.1"; else probe="2606:4700:4700::1111"; fi
     route="$(ip "-$family" route get "$probe" 2>/dev/null | head -n1 || true)"
     awk '{for (i=1; i<=NF; i++) if ($i == "dev") {print $(i+1); exit}}' <<<"$route"
+}
+
+is_virtual_interface_name() {
+    case "$1" in
+        lo|docker*|br-*|veth*|wg*|warp*|tun*|tap*|tailscale*|zt*|virbr*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+detect_inbound_interface() {
+    local family="$1" line iface address fallback=""
+    while read -r line; do
+        iface="${line%% *}"
+        [[ "$iface" == *"@"* ]] && iface="${iface%%@*}"
+        is_virtual_interface_name "$iface" && continue
+        address="$(awk '{print $2}' <<<"$line")"
+        [[ -n "$address" ]] || continue
+        if [[ -z "$fallback" ]]; then fallback="$iface"; fi
+        printf '%s\n' "$iface"
+        return 0
+    done < <(ip "-$family" -o addr show scope global 2>/dev/null | awk '{print $2, $4}')
+    if [[ -n "$fallback" ]]; then printf '%s\n' "$fallback"; return 0; fi
+    fallback="$(detect_default_interface "$family")"
+    is_virtual_interface_name "$fallback" && return 0
+    printf '%s\n' "$fallback"
 }
 
 docker_available() { command_exists docker && docker info >/dev/null 2>&1; }

@@ -2,6 +2,38 @@
 
 WARP_UPSTREAM_URL="https://raw.githubusercontent.com/yonggekkk/warp-yg/main/CFwarp.sh"
 
+warp_native_address() {
+    local family="$1" line iface address
+    while read -r line; do
+        iface="${line%% *}"
+        is_virtual_interface_name "$iface" && continue
+        address="$(awk '{print $2}' <<<"$line")"
+        [[ -n "$address" ]] && { printf '%s\n' "${address%%/*}"; return 0; }
+    done < <(ip "-$family" -o addr show scope global 2>/dev/null | awk '{print $2, $4}')
+    return 1
+}
+
+warp_pure_ipv6_check() {
+    local native4 native6 public4 public6 state4 state6
+    native4="$(warp_native_address 4 || true)"
+    native6="$(warp_native_address 6 || true)"
+    public4="$(get_public_ip 4)"; public6="$(get_public_ip 6)"
+    state4="$(get_cloudflare_warp_state 4)"; state6="$(get_cloudflare_warp_state 6)"
+    printf '原生网络：\nIPv4：%s\nIPv6：%s\n' "${native4:-无}" "${native6:-无}"
+    printf '当前公网：\nIPv4：%s\nIPv6：%s\n' "${public4:-无}" "${public6:-无}"
+    printf 'WARP：\nIPv4：%s\nIPv6：%s\n' "$state4" "$state6"
+    if [[ -z "$native4" && -n "$native6" && "$state4" =~ ^(on|plus)$ && "$state6" == "off" ]]; then
+        success "当前符合“原生 IPv6 + WARP IPv4”目标状态。"
+        return 0
+    fi
+    if [[ "$state6" =~ ^(on|plus)$ ]]; then
+        warn "当前 IPv6 也通过 WARP，不符合保留原生 IPv6 的目标状态。"
+    else
+        warn "WARP IPv4 未正常工作，或原生网络并非纯 IPv6。"
+    fi
+    return 1
+}
+
 warp_environment() {
     local ipv4 ipv6 state4 state6
     ipv4="$(get_public_ip 4)"; ipv6="$(get_public_ip 6)"
@@ -14,13 +46,6 @@ warp_environment() {
     printf 'wgcf：%s\n' "$(command_exists wgcf && printf '已安装' || printf '未安装')"
     printf 'WireGuard 接口：\n'
     ip -brief link show type wireguard 2>/dev/null || printf '  未检测到\n'
-    if [[ -z "$ipv4" && -n "$ipv6" ]]; then
-        if [[ "$state4" =~ ^(on|plus)$ && "$state6" == "off" ]]; then
-            success "纯 IPv6 场景符合目标：IPv4 走 WARP，IPv6 保持原生。"
-        else
-            warn "纯 IPv6 场景未达到建议状态：期望 IPv4 warp=on、IPv6 warp=off。"
-        fi
-    fi
 }
 
 warp_old_config() {
@@ -72,7 +97,8 @@ module_main() {
         printf '1. WARP 环境检测\n2. 启动 warp-yg 管理脚本\n3. 纯 IPv6 → WARP IPv4 场景检查\n4. WARP 故障诊断\n5. 旧 WARP 配置检查\n6. 保守修复 wgcf / warp-go 冲突\n0. 返回\n\n'
         read -r -p "请选择: " choice
         case "$choice" in
-            1|3) warp_environment; pause ;;
+            1) warp_environment; pause ;;
+            3) warp_pure_ipv6_check; pause ;;
             2) run_remote_bash "$WARP_UPSTREAM_URL" "yonggekkk/warp-yg"; pause ;;
             4) warp_diagnose; pause ;;
             5) warp_old_config; pause ;;

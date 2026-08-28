@@ -175,6 +175,7 @@ ddns_show_config() {
 }
 
 ddns_delete() {
+    local answer
     require_root || return 1
     confirm "确认删除 VPS Tools DDNS 服务和本地凭证配置？" || return 0
     systemctl disable --now vps-tools-ddns-go 2>/dev/null || true
@@ -182,7 +183,14 @@ ddns_delete() {
     systemctl daemon-reload
     [[ ! -f "$DDNS_CONFIG" ]] || backup_file "$DDNS_CONFIG" "$DDNS_DIR/backups" || return 1
     rm -f "$DDNS_CONFIG"
-    success "DDNS 配置已删除；备份仍保留在 $DDNS_DIR/backups。"
+    read -r -p "是否同时删除包含凭证的历史备份？[Y/n]: " answer
+    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
+        find "$DDNS_DIR/backups" -maxdepth 1 -type f -name 'config.yaml.*.bak' -delete 2>/dev/null || true
+        success "DDNS 配置及其凭证备份已删除。"
+    else
+        warn "历史备份中仍可能保存 API Token / 密码。"
+        success "DDNS 配置已删除；备份仍保留在 $DDNS_DIR/backups。"
+    fi
 }
 
 module_main() {

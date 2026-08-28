@@ -41,14 +41,21 @@ ZONES
 time_enable_sync() {
     require_root || return 1
     if systemctl list-unit-files systemd-timesyncd.service --no-legend 2>/dev/null | grep -q '^systemd-timesyncd.service'; then
-        timedatectl set-ntp true
-        systemctl enable --now systemd-timesyncd
-        success "已启用 systemd-timesyncd。"
+        systemctl is-enabled systemd-timesyncd 2>/dev/null | grep -q masked && { error "systemd-timesyncd 已被 mask。"; return 1; }
+        timedatectl set-ntp true || { error "无法启用 NTP。"; return 1; }
+        systemctl enable --now systemd-timesyncd || { error "systemd-timesyncd 启动失败。"; return 1; }
+        systemctl is-active --quiet systemd-timesyncd || { error "systemd-timesyncd 未处于 active。"; return 1; }
+        local ntp synchronized
+        ntp="$(timedatectl show -p NTP --value 2>/dev/null || true)"
+        synchronized="$(timedatectl show -p NTPSynchronized --value 2>/dev/null || true)"
+        [[ "$ntp" == "yes" && "$synchronized" == "yes" ]] || { error "时间同步尚未确认（NTP=$ntp NTPSynchronized=$synchronized）。"; return 1; }
+        success "已启用并验证 systemd-timesyncd。"
     elif command_exists chronyd || command_exists chronyc; then
-        systemctl enable --now chrony 2>/dev/null || systemctl enable --now chronyd
-        success "已启用 chrony。"
+        systemctl enable --now chrony 2>/dev/null || systemctl enable --now chronyd || { error "chrony 启动失败。"; return 1; }
+        systemctl is-active --quiet chrony 2>/dev/null || systemctl is-active --quiet chronyd 2>/dev/null || { error "chrony 未处于 active。"; return 1; }
+        success "已启用并验证 chrony。"
     elif confirm "系统无可用时间同步服务，是否安装 chrony？"; then
-        apt_install chrony && systemctl enable --now chrony
+        apt_install chrony && systemctl enable --now chrony && systemctl is-active --quiet chrony && success "已安装并验证 chrony。"
     else
         return 1
     fi

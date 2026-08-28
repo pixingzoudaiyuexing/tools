@@ -23,4 +23,13 @@ assert_false validate_hostname_or_ip 'bad target'
 curl() { return 22; }
 [[ -z "$(get_public_ip 6)" ]] || { printf 'IPv6 失败应返回空结果。\n' >&2; exit 1; }
 
+ip() {
+    if [[ "$*" == "-4 -o addr show scope global" ]]; then
+        printf '2: ens3    inet 198.51.100.10/24 scope global ens3\n3: warp0   inet 100.64.0.2/32 scope global warp0\n'
+    elif [[ "$*" == "-4 route get"* ]]; then
+        printf '1.1.1.1 dev warp0 src 100.64.0.2\n'
+    fi
+}
+[[ "$(detect_inbound_interface 4)" == "ens3" ]] || { printf '应优先选择物理公网接口。\n' >&2; exit 1; }
+
 printf 'test_common: PASS\n'

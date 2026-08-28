@@ -115,6 +115,7 @@ proxy_upgrade() {
 }
 
 proxy_uninstall() {
+    local answer
     require_root || return 1
     [[ -d "$PROXY_DIR" ]] || { info "尚未安装。"; return 0; }
     confirm "确认卸载 3proxy 并删除本地凭证？" || return 0
@@ -122,7 +123,14 @@ proxy_uninstall() {
     [[ ! -f "$PROXY_COMPOSE" ]] || backup_file "$PROXY_COMPOSE" "$VPS_TOOLS_ETC/backups/3proxy" || return 1
     [[ ! -f "$PROXY_COMPOSE" ]] || docker compose -f "$PROXY_COMPOSE" down --remove-orphans
     rm -rf -- "$PROXY_DIR"
-    success "3proxy 已卸载，本地配置备份保留在 $VPS_TOOLS_ETC/backups/3proxy。"
+    read -r -p "是否同时删除包含凭证的历史备份？[Y/n]: " answer
+    if [[ ! "$answer" =~ ^[Nn]$ ]]; then
+        find "$VPS_TOOLS_ETC/backups/3proxy" -maxdepth 1 -type f \( -name '.env.*.bak' -o -name 'compose.yml.*.bak' \) -delete 2>/dev/null || true
+        success "3proxy 已卸载，凭证备份已删除。"
+    else
+        warn "历史备份中仍可能保存用户名 / 密码。"
+        success "3proxy 已卸载，本地配置备份保留在 $VPS_TOOLS_ETC/backups/3proxy。"
+    fi
 }
 
 module_main() {

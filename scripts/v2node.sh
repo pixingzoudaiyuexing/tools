@@ -26,10 +26,12 @@ PY
 }
 
 v2node_change() {
-    local action="$1" node_id status
+    local action="$1" node_id status rollback
     read -r -p "请输入节点 ID: " node_id
     validate_positive_integer "$node_id" || { error "节点 ID 必须是正整数。"; return 1; }
     backup_file "$V2NODE_CONFIG" || return 1
+    rollback="$(mktemp)" || return 1
+    cp -a "$V2NODE_CONFIG" "$rollback"
     if python3 - "$V2NODE_CONFIG" "$action" "$node_id" <<'PY'
 import copy, json, os, sys, tempfile
 path, action, raw_id = sys.argv[1:]
@@ -73,10 +75,28 @@ PY
     else
         status=$?
     fi
-    [[ "$status" -eq 2 ]] && return 0
-    [[ "$status" -eq 0 ]] || return "$status"
-    systemctl restart "$V2NODE_SERVICE" || { error "配置已修改，但服务重启失败。"; return 1; }
-    if systemctl is-active --quiet "$V2NODE_SERVICE"; then success "v2node 已正常运行。"; else error "v2node 状态异常，请运行 journalctl -u v2node -n 100。"; fi
+    if [[ "$status" -eq 2 ]]; then
+        rm -f "$rollback"
+        return 0
+    fi
+    if [[ "$status" -ne 0 ]]; then
+        rm -f "$rollback"
+        return "$status"
+    fi
+    if systemctl restart "$V2NODE_SERVICE" && systemctl is-active --quiet "$V2NODE_SERVICE"; then
+        rm -f "$rollback"
+        success "v2node 已正常运行。"
+        return 0
+    fi
+    install -m 0600 "$rollback" "$V2NODE_CONFIG"
+    if systemctl restart "$V2NODE_SERVICE" && systemctl is-active --quiet "$V2NODE_SERVICE"; then
+        rm -f "$rollback"
+        error "新配置导致 v2node 启动失败，已自动回滚。"
+        return 1
+    fi
+    rm -f "$rollback"
+    error "配置已恢复，但 v2node 服务仍异常，需要人工检查日志。"
+    return 1
 }
 
 module_main() {

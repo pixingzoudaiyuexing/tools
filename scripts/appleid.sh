@@ -22,7 +22,7 @@ apple_install() {
     [[ "$node_name" =~ ^[A-Za-z0-9._-]+$ ]] || { error "节点名称无效。"; return 1; }
     script="$(mktemp)" || return 1
     download_file "$APPLE_INSTALL_URL" "$script" || { rm -f "$script"; return 1; }
-    API_URL="$api_url" API_KEY="$api_key" NODENAME="$node_name" INSTALL_DIR="$APPLE_DIR" bash "$script"
+    API_URL="$api_url" API_KEY="$api_key" NODENAME="$node_name" INSTALL_DIR="$APPLE_DIR" REPLICAS=1 bash "$script"
     local status=$?
     unset api_key api_key_again
     rm -f "$script"

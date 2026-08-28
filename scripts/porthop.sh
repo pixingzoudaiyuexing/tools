@@ -118,13 +118,42 @@ porthop_apply() {
     success "规则已通过语法检查并应用，开机恢复服务已启用。"
 }
 
+porthop_snapshot() {
+    local snapshot="$1"
+    mkdir -p "$snapshot"
+    cp -a "$PORTHOP_CONFIG" "$snapshot/rules.tsv"
+    [[ -f "$PORTHOP_RULES" ]] && cp -a "$PORTHOP_RULES" "$snapshot/rules.nft"
+}
+
 porthop_add() {
-    local start end iface4 iface6 port4 port6 id temp
+    local start end iface4 iface6 port4 port6 id temp snapshot answer
     read -r -p "请输入跳跃起始端口: " start
     read -r -p "请输入跳跃结束端口: " end
     validate_port_range "$start" "$end" || { error "端口范围无效。"; return 1; }
-    iface4="$(detect_default_interface 4)"
-    iface6="$(detect_default_interface 6)"
+    iface4="$(detect_inbound_interface 4)"
+    iface6="$(detect_inbound_interface 6)"
+    if [[ -n "$iface4" ]]; then
+        read -r -p "请输入 IPv4 入站接口 [$iface4]: " answer
+        [[ -z "$answer" ]] || iface4="$answer"
+        ip link show "$iface4" >/dev/null 2>&1 || { error "IPv4 接口不存在：$iface4"; return 1; }
+    else
+        read -r -p "未能自动判断 IPv4 入站接口，请输入接口（留空跳过）: " answer
+        if [[ -n "$answer" ]]; then
+            iface4="$answer"
+            ip link show "$iface4" >/dev/null 2>&1 || { error "IPv4 接口不存在：$iface4"; return 1; }
+        fi
+    fi
+    if [[ -n "$iface6" ]]; then
+        read -r -p "请输入 IPv6 入站接口 [$iface6]: " answer
+        [[ -z "$answer" ]] || iface6="$answer"
+        ip link show "$iface6" >/dev/null 2>&1 || { error "IPv6 接口不存在：$iface6"; return 1; }
+    else
+        read -r -p "未能自动判断 IPv6 入站接口，请输入接口（留空跳过）: " answer
+        if [[ -n "$answer" ]]; then
+            iface6="$answer"
+            ip link show "$iface6" >/dev/null 2>&1 || { error "IPv6 接口不存在：$iface6"; return 1; }
+        fi
+    fi
     if [[ -n "$iface4" ]]; then
         read -r -p "IPv4 实际 UDP 端口（留空跳过，接口 ${iface4}）: " port4
         [[ -z "$port4" ]] || validate_port "$port4" || { error "IPv4 实际端口无效。"; return 1; }
@@ -144,15 +173,25 @@ porthop_add() {
     [[ -z "$port6" ]] || ! porthop_has_conflict "$start" "$end" 6 "$iface6" || { error "IPv6 范围与已有规则冲突。"; return 1; }
     id="$(date '+%Y%m%d%H%M%S')-$RANDOM"
     backup_file "$PORTHOP_CONFIG" "$PORTHOP_DIR/backups" || return 1
+    snapshot="$(mktemp -d)" || return 1
+    porthop_snapshot "$snapshot" || { rm -rf "$snapshot"; return 1; }
     temp="$(mktemp)" || return 1
     cp "$PORTHOP_CONFIG" "$temp"
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$start" "$end" "${port4:--}" "${iface4:--}" "${port6:--}" "${iface6:--}" >>"$temp"
     install -m 0600 "$temp" "$PORTHOP_CONFIG"
     rm -f "$temp"
     if ! porthop_apply; then
-        error "应用失败，请从 $PORTHOP_DIR/backups 恢复配置后重新应用。"
+        install -m 0600 "$snapshot/rules.tsv" "$PORTHOP_CONFIG"
+        [[ -f "$snapshot/rules.nft" ]] && install -m 0600 "$snapshot/rules.nft" "$PORTHOP_RULES" || rm -f "$PORTHOP_RULES"
+        if porthop_apply; then
+            error "新配置应用失败，已自动恢复上一版规则。"
+        else
+            error "新配置和自动回滚均失败，需要人工检查 nftables。"
+        fi
+        rm -rf "$snapshot"
         return 1
     fi
+    rm -rf "$snapshot"
 }
 
 porthop_list() {
@@ -168,7 +207,7 @@ porthop_list() {
 }
 
 porthop_delete() {
-    local choice choice_number count temp
+    local choice choice_number count temp snapshot
     porthop_list
     count="$(awk 'NF {count++} END {print count+0}' "$PORTHOP_CONFIG")"
     ((count > 0)) || return 0
@@ -178,11 +217,24 @@ porthop_delete() {
     ((choice_number >= 1 && choice_number <= count)) || { error "编号无效。"; return 1; }
     confirm "确认删除第 $choice_number 条规则？" || return 0
     backup_file "$PORTHOP_CONFIG" "$PORTHOP_DIR/backups" || return 1
+    snapshot="$(mktemp -d)" || return 1
+    porthop_snapshot "$snapshot" || { rm -rf "$snapshot"; return 1; }
     temp="$(mktemp)" || return 1
     awk -v target="$choice_number" 'NF {n++} n != target {print}' "$PORTHOP_CONFIG" >"$temp"
     install -m 0600 "$temp" "$PORTHOP_CONFIG"
     rm -f "$temp"
-    porthop_apply
+    if ! porthop_apply; then
+        install -m 0600 "$snapshot/rules.tsv" "$PORTHOP_CONFIG"
+        [[ -f "$snapshot/rules.nft" ]] && install -m 0600 "$snapshot/rules.nft" "$PORTHOP_RULES" || rm -f "$PORTHOP_RULES"
+        if porthop_apply; then
+            error "新配置应用失败，已自动恢复上一版规则。"
+        else
+            error "新配置和自动回滚均失败，需要人工检查 nftables。"
+        fi
+        rm -rf "$snapshot"
+        return 1
+    fi
+    rm -rf "$snapshot"
 }
 
 porthop_show_live() {
