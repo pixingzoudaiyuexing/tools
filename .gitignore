@@ -1,0 +1,11 @@
+# 本地敏感信息和运行时配置
+.env
+*.key
+*.pem
+config.yaml
+rules.tsv
+
+# 常见临时文件
+*.tmp
+*.bak
+.DS_Store
