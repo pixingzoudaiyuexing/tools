@@ -151,7 +151,9 @@ detect_default_interface() {
 }
 
 is_virtual_interface_name() {
-    case "$1" in
+    local name
+    name="$(LC_ALL=C tr '[:upper:]' '[:lower:]' <<<"$1")"
+    case "$name" in
         lo|docker*|br-*|veth*|wg*|warp*|tun*|tap*|tailscale*|zt*|virbr*) return 0 ;;
         *) return 1 ;;
     esac

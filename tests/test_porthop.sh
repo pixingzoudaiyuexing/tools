@@ -17,6 +17,15 @@ TSV
 # shellcheck source=scripts/porthop.sh
 . "$ROOT/scripts/porthop.sh"
 
+ip() {
+    if [[ "$*" == "-4 -o addr show scope global" ]]; then
+        printf '3: WARP    inet 100.64.0.2/32 scope global WARP\n2: ens3    inet 198.51.100.10/24 scope global ens3\n'
+    elif [[ "$*" == "-4 route get"* ]]; then
+        printf '1.1.1.1 dev WARP src 100.64.0.2\n'
+    fi
+}
+[[ "$(detect_inbound_interface 4)" == "ens3" ]] || { printf 'porthop 不应选择 WARP 入站接口。\n' >&2; exit 1; }
+
 porthop_render "$PORTHOP_RULES"
 grep -Fq 'table ip vps_tools_porthop {' "$PORTHOP_RULES"
 grep -Fq 'iifname "ens3" udp dport 40000-50000 redirect to :60295' "$PORTHOP_RULES"

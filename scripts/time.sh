@@ -38,18 +38,54 @@ ZONES
     timedatectl set-timezone "$zone" && success "时区已设置为 ${zone}。"
 }
 
+time_has_timesyncd() {
+    systemctl list-unit-files systemd-timesyncd.service --no-legend 2>/dev/null | grep -q '^systemd-timesyncd.service'
+}
+
+time_timesyncd_properties() {
+    local ntp synchronized
+    ntp="$(timedatectl show -p NTP --value 2>/dev/null)" || { error "无法读取 NTP 状态。"; return 1; }
+    synchronized="$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" || { error "无法读取时间同步状态。"; return 1; }
+    printf '%s %s\n' "$ntp" "$synchronized"
+}
+
+time_wait_for_timesyncd() {
+    local elapsed=0 max_wait="${TIME_SYNC_WAIT_SECONDS:-30}" interval="${TIME_SYNC_POLL_INTERVAL:-1}"
+    local properties ntp synchronized
+    while ((elapsed < max_wait)); do
+        properties="$(time_timesyncd_properties)" || return 1
+        read -r ntp synchronized <<<"$properties"
+        if [[ "$synchronized" == "yes" ]]; then
+            success "时间同步完成。"
+            return 0
+        fi
+        [[ "$ntp" == "yes" ]] || { error "NTP 未启用。"; return 1; }
+        elapsed=$((elapsed + 1))
+        info "正在等待 NTP 同步... ${elapsed}/${max_wait} 秒"
+        sleep "$interval"
+    done
+    systemctl is-active --quiet systemd-timesyncd || { error "systemd-timesyncd 未处于 active。"; return 1; }
+    warn "NTP 服务运行正常，但 ${max_wait} 秒内尚未完成首次同步。建议稍后重新查看同步状态。"
+    return 0
+}
+
 time_enable_sync() {
+    local properties ntp synchronized
     require_root || return 1
-    if systemctl list-unit-files systemd-timesyncd.service --no-legend 2>/dev/null | grep -q '^systemd-timesyncd.service'; then
+    if time_has_timesyncd; then
         systemctl is-enabled systemd-timesyncd 2>/dev/null | grep -q masked && { error "systemd-timesyncd 已被 mask。"; return 1; }
         timedatectl set-ntp true || { error "无法启用 NTP。"; return 1; }
         systemctl enable --now systemd-timesyncd || { error "systemd-timesyncd 启动失败。"; return 1; }
         systemctl is-active --quiet systemd-timesyncd || { error "systemd-timesyncd 未处于 active。"; return 1; }
-        local ntp synchronized
-        ntp="$(timedatectl show -p NTP --value 2>/dev/null || true)"
-        synchronized="$(timedatectl show -p NTPSynchronized --value 2>/dev/null || true)"
-        [[ "$ntp" == "yes" && "$synchronized" == "yes" ]] || { error "时间同步尚未确认（NTP=$ntp NTPSynchronized=$synchronized）。"; return 1; }
-        success "已启用并验证 systemd-timesyncd。"
+        properties="$(time_timesyncd_properties)" || return 1
+        read -r ntp synchronized <<<"$properties"
+        [[ "$ntp" == "yes" ]] || { error "NTP 未启用。"; return 1; }
+        success "自动时间同步已开启。"
+        if [[ "$synchronized" == "yes" ]]; then
+            success "当前系统时间已经同步。"
+        else
+            warn "正在等待首次 NTP 同步。"
+        fi
     elif command_exists chronyd || command_exists chronyc; then
         systemctl enable --now chrony 2>/dev/null || systemctl enable --now chronyd || { error "chrony 启动失败。"; return 1; }
         systemctl is-active --quiet chrony 2>/dev/null || systemctl is-active --quiet chronyd 2>/dev/null || { error "chrony 未处于 active。"; return 1; }
@@ -64,12 +100,16 @@ time_enable_sync() {
 time_sync_now() {
     require_root || return 1
     time_enable_sync || return 1
-    if command_exists chronyc; then
-        chronyc -a makestep || true
+    if time_has_timesyncd; then
+        systemctl restart systemd-timesyncd || { error "systemd-timesyncd 重启失败。"; return 1; }
+        systemctl is-active --quiet systemd-timesyncd || { error "systemd-timesyncd 未处于 active。"; return 1; }
+        time_wait_for_timesyncd || return 1
+    elif command_exists chronyc; then
+        chronyc -a makestep || { error "chrony 立即同步失败。"; return 1; }
     else
-        systemctl restart systemd-timesyncd
+        error "未找到可用的时间同步服务。"
+        return 1
     fi
-    sleep 2
     time_show
 }
 

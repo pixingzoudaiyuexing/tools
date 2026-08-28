@@ -158,14 +158,14 @@ porthop_add() {
         read -r -p "IPv4 实际 UDP 端口（留空跳过，接口 ${iface4}）: " port4
         [[ -z "$port4" ]] || validate_port "$port4" || { error "IPv4 实际端口无效。"; return 1; }
     else
-        info "未检测到 IPv4 默认出口，跳过 IPv4。"
+        info "未检测到 IPv4 公网入站接口，跳过 IPv4。"
         port4=""
     fi
     if [[ -n "$iface6" ]]; then
         read -r -p "IPv6 实际 UDP 端口（留空跳过，接口 ${iface6}）: " port6
         [[ -z "$port6" ]] || validate_port "$port6" || { error "IPv6 实际端口无效。"; return 1; }
     else
-        info "未检测到 IPv6 默认出口，跳过 IPv6。"
+        info "未检测到 IPv6 公网入站接口，跳过 IPv6。"
         port6=""
     fi
     [[ -n "$port4" || -n "$port6" ]] || { error "IPv4 和 IPv6 不能同时跳过。"; return 1; }
