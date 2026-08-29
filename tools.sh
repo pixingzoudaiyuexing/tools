@@ -7,8 +7,21 @@ TEMP_ROOT=""
 
 cleanup() {
     [[ -n "$TEMP_ROOT" && -d "$TEMP_ROOT" ]] && rm -rf "$TEMP_ROOT"
+    return 0
 }
-trap cleanup EXIT INT TERM
+
+handle_interrupt() {
+    printf '\n已退出 VPS Tools。\n'
+    exit 130
+}
+
+handle_terminate() {
+    exit 143
+}
+
+trap cleanup EXIT
+trap handle_interrupt INT
+trap handle_terminate TERM
 
 resolve_local_root() {
     local source_dir
@@ -68,7 +81,12 @@ install_shortcut() {
 set -o pipefail
 url="https://raw.githubusercontent.com/pixingzoudaiyuexing/tools/main/tools.sh"
 temp_file="$(mktemp)" || exit 1
-trap 'rm -f "$temp_file"' EXIT INT TERM
+cleanup_launcher() {
+    rm -f "$temp_file"
+}
+trap cleanup_launcher EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 curl -fL --retry 2 --connect-timeout 10 --max-time 120 --proto '=https' --tlsv1.2 -o "$temp_file" "$url" || exit 1
 [[ -s "$temp_file" ]] || exit 1
 bash "$temp_file" "$@"
