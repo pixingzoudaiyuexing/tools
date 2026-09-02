@@ -127,8 +127,15 @@ ensure_download_environment() {
 confirm() {
     local prompt="${1:-确认继续吗？}" answer
     [[ "${VPS_TOOLS_ASSUME_YES:-0}" == "1" ]] && return 0
-    read -r -p "$prompt [y/N]: " answer
-    [[ "$answer" =~ ^[Yy]$ ]]
+
+    while true; do
+        read -r -p "$prompt [Y/n]: " answer || return 1
+        case "$answer" in
+            ""|[Yy]) return 0 ;;
+            [Nn]) return 1 ;;
+            *) warn "请输入 y 或 n；直接回车表示 Yes。" ;;
+        esac
+    done
 }
 
 validate_port() {
