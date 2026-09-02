@@ -30,7 +30,7 @@ apt-get() {
 }
 update-ca-certificates() {
     printf 'update-ca-certificates %s\n' "$*" >>"$CALLS"
-    : >"$VPS_TOOLS_CA_BUNDLE"
+    printf 'fixture-ca\n' >"$VPS_TOOLS_CA_BUNDLE"
     return 0
 }
 
@@ -41,7 +41,7 @@ grep -Fq 'apt-get install --reinstall -y openssl ca-certificates' "$CALLS"
 grep -Fq 'apt-get install -y curl' "$CALLS"
 grep -Fq 'update-ca-certificates --fresh' "$CALLS"
 [[ -f "$TEST_DIR/curl-ready" ]]
-[[ -s "$VPS_TOOLS_CA_BUNDLE" || -f "$VPS_TOOLS_CA_BUNDLE" ]]
+[[ -s "$VPS_TOOLS_CA_BUNDLE" ]]
 
 before="$(wc -l <"$CALLS")"
 ensure_download_environment
