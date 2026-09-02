@@ -54,4 +54,10 @@ grep -Fq 'apt-get install -y curl wget' "$ROOT/tools.sh"
 grep -Fq 'apt update' "$ROOT/README.md"
 grep -Fq 'apt-get install -y curl wget' "$ROOT/README.md"
 
+# 樱花基础环境修复必须紧跟 IPv6 菜单，并复用公共修复函数。
+grep -Fq '14. 樱花 VPS IPv6 启用' "$ROOT/tools.sh"
+grep -Fq '15. 樱花 VPS 基础环境修复（curl / wget / CA）' "$ROOT/tools.sh"
+grep -Fq '15) load_module sakura-env ;;' "$ROOT/tools.sh"
+grep -Fq 'repair_download_environment' "$ROOT/scripts/sakura-env.sh"
+
 printf '下载/CA 环境修复测试通过。\n'
