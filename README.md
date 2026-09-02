@@ -45,6 +45,12 @@ tools
 
 ## 功能
 
+### 节点 / 服务
+
+- V2Node 多节点管理。
+- AppleID 后端管理。
+- REALITY 443 + 网站 HTTPS 复用：直接调用 [pixingzoudaiyuexing/reality-web443-setup](https://github.com/pixingzoudaiyuexing/reality-web443-setup) 最新脚本，为已占用公网 443 的 REALITY/VLESS 节点配置网站 HTTPS 回落、Let's Encrypt 证书、Nginx、自动续期以及可选 NAT 兼容转发。
+
 ### 网络工具
 
 - 公网 IPv4 / IPv6 检测，任一协议族失败不会中断另一个。
@@ -57,6 +63,7 @@ tools
 - 3proxy Docker：带认证的 HTTP / SOCKS5 代理安装、修改、启停、升级和卸载。
 - BBRv3、流媒体解锁、TikTok 地区检测入口。
 - 樱花 VPS Debian 12 预置 IPv6 精确启用和验证。
+- 樱花 VPS 基础环境修复：`apt-get update`、重新安装 `openssl` / `ca-certificates`、安装 `curl` / `wget` 并刷新 CA 证书。
 
 ### 系统工具
 
@@ -129,4 +136,4 @@ bash <(curl -fsSL https://raw.githubusercontent.com/pixingzoudaiyuexing/tools/ma
 tests/run.sh
 ```
 
-测试会执行全部 Shell 语法检查，以及公共校验、V2Node fixture、DDNS YAML、nftables 规则生成、下载/CA 环境修复和危险命令静态测试；不会真实修改开发机的 SSH、防火墙、Swap、Docker、systemd 或执行重装。
+测试会执行全部 Shell 语法检查，以及公共校验、V2Node fixture、DDNS YAML、nftables 规则生成、下载/CA 环境修复、REALITY web443 入口和危险命令静态测试；不会真实修改开发机的 SSH、防火墙、Swap、Docker、systemd 或执行重装。
