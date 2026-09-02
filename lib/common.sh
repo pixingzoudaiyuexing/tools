@@ -90,25 +90,26 @@ repair_download_environment() {
     require_root || return 1
     require_debian_ubuntu || return 1
 
-    warn "检测到 curl 或 CA 证书环境异常，正在修复 Debian / Ubuntu 下载环境。"
+    warn "检测到 curl、wget 或 CA 证书环境异常，正在修复 Debian / Ubuntu 下载环境。"
     mkdir -p "$(dirname "$ca_bundle")" || { error "无法创建 CA 证书目录。"; return 1; }
     DEBIAN_FRONTEND=noninteractive apt-get update || { error "apt-get update 失败。"; return 1; }
     DEBIAN_FRONTEND=noninteractive apt-get install --reinstall -y openssl ca-certificates || {
         error "重新安装 openssl / ca-certificates 失败。"
         return 1
     }
-    DEBIAN_FRONTEND=noninteractive apt-get install -y curl || { error "安装 curl 失败。"; return 1; }
+    DEBIAN_FRONTEND=noninteractive apt-get install -y curl wget || { error "安装 curl / wget 失败。"; return 1; }
     update-ca-certificates --fresh || { error "刷新 CA 证书失败。"; return 1; }
 
     command_exists curl || { error "curl 安装后仍不可用。"; return 1; }
+    command_exists wget || { error "wget 安装后仍不可用。"; return 1; }
     [[ -s "$ca_bundle" ]] || { error "CA 证书文件仍不存在或为空：$ca_bundle"; return 1; }
-    success "curl 与 CA 证书环境修复完成。"
+    success "curl、wget 与 CA 证书环境修复完成。"
 }
 
 ensure_download_environment() {
     local ca_bundle="${VPS_TOOLS_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}"
 
-    if command_exists curl; then
+    if command_exists curl && command_exists wget; then
         if ! is_debian_ubuntu_system || [[ -s "$ca_bundle" ]]; then
             return 0
         fi
@@ -119,7 +120,7 @@ ensure_download_environment() {
         return $?
     fi
 
-    error "缺少可用的 curl，且当前系统不属于 Debian / Ubuntu，无法自动修复。"
+    error "缺少可用的 curl / wget，且当前系统不属于 Debian / Ubuntu，无法自动修复。"
     return 1
 }
 
