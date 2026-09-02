@@ -4,6 +4,7 @@ set -u
 
 RAW_BASE="${VPS_TOOLS_RAW_BASE:-https://raw.githubusercontent.com/pixingzoudaiyuexing/tools/main}"
 TEMP_ROOT=""
+CA_BUNDLE="${VPS_TOOLS_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}"
 
 cleanup() {
     [[ -n "$TEMP_ROOT" && -d "$TEMP_ROOT" ]] && rm -rf "$TEMP_ROOT"
@@ -23,6 +24,42 @@ trap cleanup EXIT
 trap handle_interrupt INT
 trap handle_terminate TERM
 
+bootstrap_is_debian_ubuntu() (
+    [[ -r /etc/os-release ]] || return 1
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    case "${ID:-}" in
+        debian|ubuntu) return 0 ;;
+        *) return 1 ;;
+    esac
+)
+
+bootstrap_download_environment() {
+    if command -v curl >/dev/null 2>&1 && { ! bootstrap_is_debian_ubuntu || [[ -s "$CA_BUNDLE" ]]; }; then
+        return 0
+    fi
+
+    if ! bootstrap_is_debian_ubuntu; then
+        printf '缺少可用的 curl，当前系统无法自动修复。\n' >&2
+        return 1
+    fi
+    if [[ "$(id -u)" -ne 0 ]]; then
+        printf '检测到 curl 或 CA 证书环境异常，请先使用 sudo -i 获取 root 权限后重试。\n' >&2
+        return 1
+    fi
+
+    printf '检测到 curl 或 CA 证书环境异常，正在自动修复...\n'
+    mkdir -p "$(dirname "$CA_BUNDLE")" || return 1
+    DEBIAN_FRONTEND=noninteractive apt-get update || return 1
+    DEBIAN_FRONTEND=noninteractive apt-get install --reinstall -y openssl ca-certificates || return 1
+    DEBIAN_FRONTEND=noninteractive apt-get install -y curl || return 1
+    update-ca-certificates --fresh || return 1
+
+    command -v curl >/dev/null 2>&1 || return 1
+    [[ -s "$CA_BUNDLE" ]] || return 1
+    printf 'curl 与 CA 证书环境修复完成。\n'
+}
+
 resolve_local_root() {
     local source_dir
     source_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || return 1
@@ -36,6 +73,7 @@ prepare_runtime() {
     elif VPS_TOOLS_ROOT="$(resolve_local_root)"; then
         :
     else
+        bootstrap_download_environment || { printf '基础下载环境修复失败。\n' >&2; exit 1; }
         TEMP_ROOT="$(mktemp -d)" || { printf '无法创建临时目录。\n' >&2; exit 1; }
         mkdir -p "$TEMP_ROOT/lib" "$TEMP_ROOT/scripts"
         if ! curl -fL --retry 2 --connect-timeout 10 --max-time 60 --proto '=https' --tlsv1.2 \
@@ -84,9 +122,28 @@ temp_file="$(mktemp)" || exit 1
 cleanup_launcher() {
     rm -f "$temp_file"
 }
+repair_launcher_environment() {
+    if command -v curl >/dev/null 2>&1 && [[ -s /etc/ssl/certs/ca-certificates.crt ]]; then
+        return 0
+    fi
+    [[ "$(id -u)" -eq 0 ]] || { printf 'curl 或 CA 证书环境异常，请先使用 sudo -i 后重试。\n' >&2; return 1; }
+    [[ -r /etc/os-release ]] || return 1
+    (
+        . /etc/os-release
+        case "${ID:-}" in debian|ubuntu) exit 0 ;; *) exit 1 ;; esac
+    ) || { printf '当前系统无法自动修复 curl / CA 环境。\n' >&2; return 1; }
+    printf '检测到 curl 或 CA 证书环境异常，正在自动修复...\n'
+    mkdir -p /etc/ssl/certs || return 1
+    DEBIAN_FRONTEND=noninteractive apt-get update || return 1
+    DEBIAN_FRONTEND=noninteractive apt-get install --reinstall -y openssl ca-certificates || return 1
+    DEBIAN_FRONTEND=noninteractive apt-get install -y curl || return 1
+    update-ca-certificates --fresh || return 1
+    command -v curl >/dev/null 2>&1 && [[ -s /etc/ssl/certs/ca-certificates.crt ]]
+}
 trap cleanup_launcher EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+repair_launcher_environment || exit 1
 curl -fL --retry 2 --connect-timeout 10 --max-time 120 --proto '=https' --tlsv1.2 -o "$temp_file" "$url" || exit 1
 [[ -s "$temp_file" ]] || exit 1
 bash "$temp_file" "$@"
