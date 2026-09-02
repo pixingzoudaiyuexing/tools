@@ -86,7 +86,8 @@ tools
 
 ## 安全边界
 
-- 高风险操作均使用普通 `[y/N]` 确认，不要求输入特殊确认字符串。
+- VPS Tools 自身的确认提示统一使用 `[Y/n]`：直接回车表示 Yes，只有明确输入 `n` / `N` 才取消。
+- 高风险操作仍会显示明确警告，但不要求输入特殊确认字符串。
 - 端口跳跃只创建 `table ip vps_tools_porthop` 和 `table ip6 vps_tools_porthop`，不会执行 `nft flush ruleset`，不会清空其他防火墙。
 - Root SSH 只管理自己的 drop-in 文件，恢复时不会重写原始 `sshd_config`。
 - 临时 SSH 密钥只删除带唯一 `vps-tools-temp-*` ID 的公钥行；私钥只显示一次，随后立即从服务器删除。
