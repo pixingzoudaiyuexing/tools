@@ -173,32 +173,33 @@ main_menu() {
 [节点 / 服务]
  1. V2Node 多节点管理
  2. AppleID 后端管理
+ 3. REALITY 443 + 网站 HTTPS 复用
 
 [网络工具]
- 3. 查看公网 IPv4 / IPv6
- 4. 端口占用 / 监听查询
- 5. UDP / Hy2 端口跳跃
- 6. VPS 端口中转（Realm）
- 7. 路由 / 链路测试
- 8. WARP 网络管理
- 9. DDNS 管理
-10. HTTP / SOCKS5 代理
-11. BBRv3 内核 / 网络优化
-12. 流媒体 / 地区解锁检测
-13. TikTok 地区检测
-14. 樱花 VPS IPv6 启用
-15. 樱花 VPS 基础环境修复（curl / wget / CA）
+ 4. 查看公网 IPv4 / IPv6
+ 5. 端口占用 / 监听查询
+ 6. UDP / Hy2 端口跳跃
+ 7. VPS 端口中转（Realm）
+ 8. 路由 / 链路测试
+ 9. WARP 网络管理
+10. DDNS 管理
+11. HTTP / SOCKS5 代理
+12. BBRv3 内核 / 网络优化
+13. 流媒体 / 地区解锁检测
+14. TikTok 地区检测
+15. 樱花 VPS IPv6 启用
+16. 樱花 VPS 基础环境修复（curl / wget / CA）
 
 [系统工具]
-16. Linux 系统换源
-17. Swap 管理
-18. 时间 / 时区管理
-19. Root SSH 管理
-20. 临时 SSH 密钥管理
-21. VPS 系统重装
+17. Linux 系统换源
+18. Swap 管理
+19. 时间 / 时区管理
+20. Root SSH 管理
+21. 临时 SSH 密钥管理
+22. VPS 系统重装
 
 [Docker]
-22. Docker 管理
+23. Docker 管理
 
 [工具箱]
 98. 安装 tools 快捷命令
@@ -210,26 +211,27 @@ MENU
         case "$choice" in
             1) load_module v2node ;;
             2) load_module appleid ;;
-            3) load_module ip-check ;;
-            4) load_module port-check ;;
-            5) load_module porthop ;;
-            6) load_module realm ;;
-            7) load_module route-test ;;
-            8) load_module warp ;;
-            9) load_module ddns ;;
-            10) load_module proxy ;;
-            11) load_module bbr ;;
-            12) load_module media ;;
-            13) load_module tiktok ;;
-            14) load_module sakura-ipv6 ;;
-            15) load_module sakura-env ;;
-            16) load_module mirrors ;;
-            17) load_module swap ;;
-            18) load_module time ;;
-            19) load_module root-ssh ;;
-            20) load_module temp-ssh-key ;;
-            21) load_module reinstall ;;
-            22) load_module docker ;;
+            3) load_module reality-web443 ;;
+            4) load_module ip-check ;;
+            5) load_module port-check ;;
+            6) load_module porthop ;;
+            7) load_module realm ;;
+            8) load_module route-test ;;
+            9) load_module warp ;;
+            10) load_module ddns ;;
+            11) load_module proxy ;;
+            12) load_module bbr ;;
+            13) load_module media ;;
+            14) load_module tiktok ;;
+            15) load_module sakura-ipv6 ;;
+            16) load_module sakura-env ;;
+            17) load_module mirrors ;;
+            18) load_module swap ;;
+            19) load_module time ;;
+            20) load_module root-ssh ;;
+            21) load_module temp-ssh-key ;;
+            22) load_module reinstall ;;
+            23) load_module docker ;;
             98) install_shortcut; pause ;;
             99) show_info ;;
             0) success "已退出。"; return 0 ;;
