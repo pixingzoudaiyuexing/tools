@@ -12,20 +12,20 @@ bash <(curl -fsSL https://raw.githubusercontent.com/pixingzoudaiyuexing/tools/ma
 
 ### 樱花 VPS Debian 12 首次初始化
 
-部分樱花 VPS 的 Debian 12 初始系统可能没有安装 `curl`，或者 `/etc/ssl/certs` / CA 证书环境不完整。第一次使用时先执行下面这一条完整命令；其中已经包含 `apt update`、CA 证书修复和 `curl` 安装：
+部分樱花 VPS 的 Debian 12 初始系统可能没有安装 `curl` / `wget`，或者 `/etc/ssl/certs` / CA 证书环境不完整。第一次使用时先执行下面这一条完整命令；其中已经包含 `apt update`、CA 证书修复以及 `curl` / `wget` 安装：
 
 ```bash
 mkdir -p /etc/ssl/certs && \
 apt update && \
 DEBIAN_FRONTEND=noninteractive apt-get install --reinstall -y openssl ca-certificates && \
-DEBIAN_FRONTEND=noninteractive apt-get install -y curl && \
+DEBIAN_FRONTEND=noninteractive apt-get install -y curl wget && \
 update-ca-certificates --fresh && \
 bash <(curl -fsSL https://raw.githubusercontent.com/pixingzoudaiyuexing/tools/main/tools.sh)
 ```
 
-如果已经可以正常运行 `curl` 且 `/etc/ssl/certs/ca-certificates.crt` 存在，直接使用普通一键命令即可。
+如果已经可以正常运行 `curl`、`wget` 且 `/etc/ssl/certs/ca-certificates.crt` 存在，直接使用普通一键命令即可。
 
-工具箱内部在后续下载模块时也会检查 Debian / Ubuntu 的 `curl` 与 CA 证书环境；如果发现缺失并且当前是 root，会自动执行 `apt-get update`、重新安装 `openssl` / `ca-certificates`、安装 `curl` 并刷新 CA 证书。
+工具箱内部在后续下载模块时也会检查 Debian / Ubuntu 的 `curl`、`wget` 与 CA 证书环境；如果发现缺失并且当前是 root，会自动执行 `apt-get update`、重新安装 `openssl` / `ca-certificates`、安装 `curl` / `wget` 并刷新 CA 证书。
 
 系统级功能需要 root。普通 sudo 用户可先执行 `sudo -i`，再运行上面的命令。
 
@@ -41,7 +41,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/pixingzoudaiyuexing/tools/ma
 tools
 ```
 
-快捷启动器每次联网加载 GitHub 最新版 `tools.sh`，不会保存工具箱副本；快捷启动器也会在 Debian / Ubuntu 上检查并尝试修复 `curl` / CA 证书环境。
+快捷启动器每次联网加载 GitHub 最新版 `tools.sh`，不会保存工具箱副本；快捷启动器也会在 Debian / Ubuntu 上检查并尝试修复 `curl` / `wget` / CA 证书环境。
 
 ## 功能
 
