@@ -49,6 +49,16 @@ require_root() {
     return 1
 }
 
+is_debian_ubuntu_system() (
+    [[ -r /etc/os-release ]] || return 1
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    case "${ID:-}" in
+        debian|ubuntu) return 0 ;;
+        *) return 1 ;;
+    esac
+)
+
 require_debian_ubuntu() {
     if [[ ! -r /etc/os-release ]]; then
         error "无法识别系统，仅支持 Debian / Ubuntu。"
@@ -73,6 +83,44 @@ apt_install() {
     info "正在安装：${missing[*]}"
     DEBIAN_FRONTEND=noninteractive apt-get update || { error "apt-get update 失败。"; return 1; }
     DEBIAN_FRONTEND=noninteractive apt-get install -y "${missing[@]}" || { error "软件安装失败：${missing[*]}"; return 1; }
+}
+
+repair_download_environment() {
+    local ca_bundle="${VPS_TOOLS_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}"
+    require_root || return 1
+    require_debian_ubuntu || return 1
+
+    warn "检测到 curl 或 CA 证书环境异常，正在修复 Debian / Ubuntu 下载环境。"
+    mkdir -p "$(dirname "$ca_bundle")" || { error "无法创建 CA 证书目录。"; return 1; }
+    DEBIAN_FRONTEND=noninteractive apt-get update || { error "apt-get update 失败。"; return 1; }
+    DEBIAN_FRONTEND=noninteractive apt-get install --reinstall -y openssl ca-certificates || {
+        error "重新安装 openssl / ca-certificates 失败。"
+        return 1
+    }
+    DEBIAN_FRONTEND=noninteractive apt-get install -y curl || { error "安装 curl 失败。"; return 1; }
+    update-ca-certificates --fresh || { error "刷新 CA 证书失败。"; return 1; }
+
+    command_exists curl || { error "curl 安装后仍不可用。"; return 1; }
+    [[ -s "$ca_bundle" ]] || { error "CA 证书文件仍不存在或为空：$ca_bundle"; return 1; }
+    success "curl 与 CA 证书环境修复完成。"
+}
+
+ensure_download_environment() {
+    local ca_bundle="${VPS_TOOLS_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}"
+
+    if command_exists curl; then
+        if ! is_debian_ubuntu_system || [[ -s "$ca_bundle" ]]; then
+            return 0
+        fi
+    fi
+
+    if is_debian_ubuntu_system; then
+        repair_download_environment
+        return $?
+    fi
+
+    error "缺少可用的 curl，且当前系统不属于 Debian / Ubuntu，无法自动修复。"
+    return 1
 }
 
 confirm() {
@@ -111,7 +159,7 @@ backup_file() {
 
 download_file() {
     local url="$1" destination="$2"
-    command_exists curl || apt_install curl ca-certificates || return 1
+    ensure_download_environment || return 1
     curl -fL --retry 2 --connect-timeout 10 --max-time 120 --proto '=https' --tlsv1.2 \
         -o "$destination" "$url" || { error "下载失败：$url"; rm -f "$destination"; return 1; }
     [[ -s "$destination" ]] || { error "下载内容为空：$url"; rm -f "$destination"; return 1; }
