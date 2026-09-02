@@ -31,6 +31,19 @@ assert_false is_virtual_interface_name ens3
 assert_false is_virtual_interface_name eth0
 assert_false is_virtual_interface_name enp1s0
 
+# VPS Tools 自身的确认统一默认 Yes：直接回车或 y/Y 继续，n/N 取消。
+confirm "测试默认确认" <<<"" >/dev/null
+confirm "测试显式 Yes" <<<"y" >/dev/null
+confirm "测试大写 Yes" <<<"Y" >/dev/null
+if confirm "测试显式 No" <<<"n" >/dev/null; then
+    printf '输入 n 时 confirm 不应返回成功。\n' >&2
+    exit 1
+fi
+if confirm "测试大写 No" <<<"N" >/dev/null; then
+    printf '输入 N 时 confirm 不应返回成功。\n' >&2
+    exit 1
+fi
+
 curl() { return 22; }
 [[ -z "$(get_public_ip 6)" ]] || { printf 'IPv6 失败应返回空结果。\n' >&2; exit 1; }
 
