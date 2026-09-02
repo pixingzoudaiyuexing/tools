@@ -35,29 +35,30 @@ bootstrap_is_debian_ubuntu() (
 )
 
 bootstrap_download_environment() {
-    if command -v curl >/dev/null 2>&1 && { ! bootstrap_is_debian_ubuntu || [[ -s "$CA_BUNDLE" ]]; }; then
+    if command -v curl >/dev/null 2>&1 && command -v wget >/dev/null 2>&1 && { ! bootstrap_is_debian_ubuntu || [[ -s "$CA_BUNDLE" ]]; }; then
         return 0
     fi
 
     if ! bootstrap_is_debian_ubuntu; then
-        printf '缺少可用的 curl，当前系统无法自动修复。\n' >&2
+        printf '缺少可用的 curl / wget，当前系统无法自动修复。\n' >&2
         return 1
     fi
     if [[ "$(id -u)" -ne 0 ]]; then
-        printf '检测到 curl 或 CA 证书环境异常，请先使用 sudo -i 获取 root 权限后重试。\n' >&2
+        printf '检测到 curl、wget 或 CA 证书环境异常，请先使用 sudo -i 获取 root 权限后重试。\n' >&2
         return 1
     fi
 
-    printf '检测到 curl 或 CA 证书环境异常，正在自动修复...\n'
+    printf '检测到 curl、wget 或 CA 证书环境异常，正在自动修复...\n'
     mkdir -p "$(dirname "$CA_BUNDLE")" || return 1
     DEBIAN_FRONTEND=noninteractive apt-get update || return 1
     DEBIAN_FRONTEND=noninteractive apt-get install --reinstall -y openssl ca-certificates || return 1
-    DEBIAN_FRONTEND=noninteractive apt-get install -y curl || return 1
+    DEBIAN_FRONTEND=noninteractive apt-get install -y curl wget || return 1
     update-ca-certificates --fresh || return 1
 
     command -v curl >/dev/null 2>&1 || return 1
+    command -v wget >/dev/null 2>&1 || return 1
     [[ -s "$CA_BUNDLE" ]] || return 1
-    printf 'curl 与 CA 证书环境修复完成。\n'
+    printf 'curl、wget 与 CA 证书环境修复完成。\n'
 }
 
 resolve_local_root() {
@@ -123,22 +124,22 @@ cleanup_launcher() {
     rm -f "$temp_file"
 }
 repair_launcher_environment() {
-    if command -v curl >/dev/null 2>&1 && [[ -s /etc/ssl/certs/ca-certificates.crt ]]; then
+    if command -v curl >/dev/null 2>&1 && command -v wget >/dev/null 2>&1 && [[ -s /etc/ssl/certs/ca-certificates.crt ]]; then
         return 0
     fi
-    [[ "$(id -u)" -eq 0 ]] || { printf 'curl 或 CA 证书环境异常，请先使用 sudo -i 后重试。\n' >&2; return 1; }
+    [[ "$(id -u)" -eq 0 ]] || { printf 'curl、wget 或 CA 证书环境异常，请先使用 sudo -i 后重试。\n' >&2; return 1; }
     [[ -r /etc/os-release ]] || return 1
     (
         . /etc/os-release
         case "${ID:-}" in debian|ubuntu) exit 0 ;; *) exit 1 ;; esac
-    ) || { printf '当前系统无法自动修复 curl / CA 环境。\n' >&2; return 1; }
-    printf '检测到 curl 或 CA 证书环境异常，正在自动修复...\n'
+    ) || { printf '当前系统无法自动修复 curl / wget / CA 环境。\n' >&2; return 1; }
+    printf '检测到 curl、wget 或 CA 证书环境异常，正在自动修复...\n'
     mkdir -p /etc/ssl/certs || return 1
     DEBIAN_FRONTEND=noninteractive apt-get update || return 1
     DEBIAN_FRONTEND=noninteractive apt-get install --reinstall -y openssl ca-certificates || return 1
-    DEBIAN_FRONTEND=noninteractive apt-get install -y curl || return 1
+    DEBIAN_FRONTEND=noninteractive apt-get install -y curl wget || return 1
     update-ca-certificates --fresh || return 1
-    command -v curl >/dev/null 2>&1 && [[ -s /etc/ssl/certs/ca-certificates.crt ]]
+    command -v curl >/dev/null 2>&1 && command -v wget >/dev/null 2>&1 && [[ -s /etc/ssl/certs/ca-certificates.crt ]]
 }
 trap cleanup_launcher EXIT
 trap 'exit 130' INT
