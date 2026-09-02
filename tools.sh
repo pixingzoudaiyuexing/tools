@@ -187,17 +187,18 @@ main_menu() {
 12. 流媒体 / 地区解锁检测
 13. TikTok 地区检测
 14. 樱花 VPS IPv6 启用
+15. 樱花 VPS 基础环境修复（curl / wget / CA）
 
 [系统工具]
-15. Linux 系统换源
-16. Swap 管理
-17. 时间 / 时区管理
-18. Root SSH 管理
-19. 临时 SSH 密钥管理
-20. VPS 系统重装
+16. Linux 系统换源
+17. Swap 管理
+18. 时间 / 时区管理
+19. Root SSH 管理
+20. 临时 SSH 密钥管理
+21. VPS 系统重装
 
 [Docker]
-21. Docker 管理
+22. Docker 管理
 
 [工具箱]
 98. 安装 tools 快捷命令
@@ -221,13 +222,14 @@ MENU
             12) load_module media ;;
             13) load_module tiktok ;;
             14) load_module sakura-ipv6 ;;
-            15) load_module mirrors ;;
-            16) load_module swap ;;
-            17) load_module time ;;
-            18) load_module root-ssh ;;
-            19) load_module temp-ssh-key ;;
-            20) load_module reinstall ;;
-            21) load_module docker ;;
+            15) load_module sakura-env ;;
+            16) load_module mirrors ;;
+            17) load_module swap ;;
+            18) load_module time ;;
+            19) load_module root-ssh ;;
+            20) load_module temp-ssh-key ;;
+            21) load_module reinstall ;;
+            22) load_module docker ;;
             98) install_shortcut; pause ;;
             99) show_info ;;
             0) success "已退出。"; return 0 ;;
