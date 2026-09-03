@@ -56,7 +56,7 @@ tools
 - 公网 IPv4 / IPv6 检测，任一协议族失败不会中断另一个。
 - TCP/UDP 监听和指定端口占用查询，使用 `ss`，可选安装 `lsof`。
 - UDP / Hy2 端口跳跃：IPv4/IPv6 独立网卡、多规则、冲突检查、nftables 语法检查和 systemd 持久化。
-- Realm 端口中转：提供 IPv4 / IPv6 自动识别的快速添加入口，支持“双栈中转 → 纯 IPv6 落地”；裸 IPv6 会自动转换为 `[IPv6]:端口`，写入前显示目标类型和转发链路，新规则导致 Realm 启动失败时自动恢复原配置；完整上游 Realm 管理脚本仍保留用于安装、删除、端口段、日志和面板管理。
+- Realm 端口中转：提供 IPv4 / IPv6 自动识别的快速添加入口，支持“双栈中转 → 纯 IPv6 落地”；裸 IPv6 会自动转换为 `[IPv6]:端口`，写入前显示目标类型和转发链路。若上游脚本安装的 Realm 出现 `GLIBC_x.xx not found`，VPS Tools 会自动从 Realm 官方最新 Release 选择 `glibc2.28` 兼容构建替换二进制并重启服务，也可在 Realm 菜单手动执行“glibc 兼容修复”；不会升级系统 glibc。新规则导致 Realm 启动失败时会自动恢复原配置；完整上游 Realm 管理脚本仍保留用于安装、删除、端口段、日志和面板管理。
 - NextTrace ICMP/TCP/UDP 路由测试和 MTR 丢包/延迟测试。
 - WARP：提供“纯 IPv4 机器一键添加 IPv6”和“纯 IPv6 机器一键添加 IPv4”两个快捷入口。选择后自动检测原生协议族、自动调用 `warp-yg` 完成后续部署并验证目标状态，不需要继续在上游菜单中手动选择；同时提供“一键卸载所有 WARP”，统一停止并清理 WARP-GO、WGCF、Socks5-WARP / `cloudflare-warp`、`warp-yg` 在线监测和已知残留，完成后自动检查 WARP 与当前 IPv4 / IPv6 状态。
 - WARP 自动快捷项只允许在真实纯 IPv4 / 纯 IPv6 网络上执行；双栈机器会直接拒绝。若同时检测到 warp-go 与 WGCF 配置，也会停止自动部署，避免盲目修改路由。首次安装默认使用 WARP-GO；若已经存在单一 WARP 后端，则尽量沿用现有后端。WARP 一键卸载不会删除通用 `wireguard-tools`，也不会执行全局 iptables / nftables 清空。
@@ -96,6 +96,7 @@ tools
 
 - VPS Tools 自身的确认提示统一使用 `[Y/n]`：直接回车表示 Yes，只有明确输入 `n` / `N` 才取消。
 - 高风险操作仍会显示明确警告，但不要求输入特殊确认字符串。
+- Realm glibc 兼容修复只替换 Realm 自己的二进制并保留备份，不会安装、升级或替换系统 `glibc` / `libc6`。
 - WARP 两个自动快捷项在用户选择后不再二次询问；因此会先严格验证机器确实是纯 IPv4 或纯 IPv6，并检查冲突后端和上游菜单结构，任何一项不符合都会停止而不是猜测执行。
 - WARP 一键卸载会先显示 `[Y/n]` 确认，然后自动完成后续清理；不会卸载通用 WireGuard 软件包，也不会清空用户已有的 iptables / nftables 规则。
 - 端口跳跃只创建 `table ip vps_tools_porthop` 和 `table ip6 vps_tools_porthop`，不会执行 `nft flush ruleset`，不会清空其他防火墙。
@@ -139,4 +140,4 @@ bash <(curl -fsSL https://raw.githubusercontent.com/pixingzoudaiyuexing/tools/ma
 tests/run.sh
 ```
 
-测试会执行全部 Shell 语法检查，以及公共校验、V2Node fixture、DDNS YAML、nftables 规则生成、下载/CA 环境修复、REALITY web443 入口、Realm IPv6 快速转发、WARP 自动快捷项、WARP 一键卸载和危险命令静态测试；不会真实修改开发机的 SSH、防火墙、Swap、Docker、systemd 或执行重装。
+测试会执行全部 Shell 语法检查，以及公共校验、V2Node fixture、DDNS YAML、nftables 规则生成、下载/CA 环境修复、REALITY web443 入口、Realm IPv6 快速转发、Realm glibc 兼容修复、WARP 自动快捷项、WARP 一键卸载和危险命令静态测试；不会真实修改开发机的 SSH、防火墙、Swap、Docker、systemd 或执行重装。
