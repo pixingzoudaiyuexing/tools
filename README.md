@@ -58,7 +58,8 @@ tools
 - UDP / Hy2 端口跳跃：IPv4/IPv6 独立网卡、多规则、冲突检查、nftables 语法检查和 systemd 持久化。
 - Realm 端口中转入口。
 - NextTrace ICMP/TCP/UDP 路由测试和 MTR 丢包/延迟测试。
-- WARP 环境检查、纯 IPv6 + WARP IPv4 验证、日志诊断、旧 wgcf 冲突检查和保守修复。
+- WARP：提供“纯 IPv4 机器一键添加 IPv6”和“纯 IPv6 机器一键添加 IPv4”两个快捷入口。选择后自动检测原生协议族、自动调用 `warp-yg` 完成后续部署并验证目标状态，不需要继续在上游菜单中手动选择；同时保留环境检测、手动管理脚本、目标状态检查、故障诊断、旧配置检查和保守冲突修复。
+- WARP 自动快捷项只允许在真实纯 IPv4 / 纯 IPv6 网络上执行；双栈机器会直接拒绝。若同时检测到 warp-go 与 WGCF 配置，也会停止自动部署，避免盲目修改路由。首次安装默认使用 WARP-GO；若已经存在单一 WARP 后端，则尽量沿用现有后端。
 - DDNS-GO：Cloudflare、华为云、阿里云、DNSPod，A/AAAA 可分别启用，本地 `-noweb` 服务。
 - 3proxy Docker：带认证的 HTTP / SOCKS5 代理安装、修改、启停、升级和卸载。
 - BBRv3、流媒体解锁、TikTok 地区检测入口。
@@ -95,6 +96,7 @@ tools
 
 - VPS Tools 自身的确认提示统一使用 `[Y/n]`：直接回车表示 Yes，只有明确输入 `n` / `N` 才取消。
 - 高风险操作仍会显示明确警告，但不要求输入特殊确认字符串。
+- WARP 两个自动快捷项在用户选择后不再二次询问；因此会先严格验证机器确实是纯 IPv4 或纯 IPv6，并检查冲突后端和上游菜单结构，任何一项不符合都会停止而不是猜测执行。
 - 端口跳跃只创建 `table ip vps_tools_porthop` 和 `table ip6 vps_tools_porthop`，不会执行 `nft flush ruleset`，不会清空其他防火墙。
 - Root SSH 只管理自己的 drop-in 文件，恢复时不会重写原始 `sshd_config`。
 - 临时 SSH 密钥只删除带唯一 `vps-tools-temp-*` ID 的公钥行；私钥只显示一次，随后立即从服务器删除。
@@ -136,4 +138,4 @@ bash <(curl -fsSL https://raw.githubusercontent.com/pixingzoudaiyuexing/tools/ma
 tests/run.sh
 ```
 
-测试会执行全部 Shell 语法检查，以及公共校验、V2Node fixture、DDNS YAML、nftables 规则生成、下载/CA 环境修复、REALITY web443 入口和危险命令静态测试；不会真实修改开发机的 SSH、防火墙、Swap、Docker、systemd 或执行重装。
+测试会执行全部 Shell 语法检查，以及公共校验、V2Node fixture、DDNS YAML、nftables 规则生成、下载/CA 环境修复、REALITY web443 入口、WARP 自动快捷项和危险命令静态测试；不会真实修改开发机的 SSH、防火墙、Swap、Docker、systemd 或执行重装。
