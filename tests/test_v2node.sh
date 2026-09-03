@@ -21,7 +21,10 @@ JSON
 backup_file() { :; }
 systemctl() { return 0; }
 
-v2node_change add <<<"7" >/dev/null
+[[ "$(v2node_list)" == "现有节点 ID：1" ]]
+
+output="$(v2node_change add <<<"7")"
+grep -Fq '现有节点 ID：1' <<<"$output"
 python3 - "$V2NODE_CONFIG" <<'PY'
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as f:
@@ -31,14 +34,16 @@ assert data["Nodes"][1]["ApiHost"] == "https://panel.example.com"
 assert data["Log"]["Level"] == "info"
 PY
 
-v2node_change add <<<"7" >/dev/null
+output="$(v2node_change add <<<"7")"
+grep -Fq '现有节点 ID：1, 7' <<<"$output"
 python3 - "$V2NODE_CONFIG" <<'PY'
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as f:
     assert [n["NodeID"] for n in json.load(f)["Nodes"]] == [1, 7]
 PY
 
-v2node_change delete <<<"7" >/dev/null
+output="$(v2node_change delete <<<"7")"
+grep -Fq '现有节点 ID：1, 7' <<<"$output"
 python3 - "$V2NODE_CONFIG" <<'PY'
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as f:
