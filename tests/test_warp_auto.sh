@@ -12,13 +12,8 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 
 export WARP_CF_COMMAND="$TEST_DIR/cf"
 backend="none"
-command_exists() {
-    case "$1" in
-        warp-go) [[ "$backend" == "warp-go" || "$backend" == "both" ]] ;;
-        wg-quick) [[ "$backend" == "wgcf" || "$backend" == "both" ]] ;;
-        *) command -v "$1" >/dev/null 2>&1 ;;
-    esac
-}
+warp_has_warp_go() { [[ "$backend" == "warp-go" || "$backend" == "both" ]]; }
+warp_has_wgcf() { [[ "$backend" == "wgcf" || "$backend" == "both" ]]; }
 
 # 全新机器默认自动选择 WARP-GO：纯 IPv4 补 IPv6 => 3 -> 1 -> 2。
 backend="none"
@@ -41,23 +36,23 @@ backend="wgcf"
     exit 1
 }
 
-# 已有 warp-go 且 cf 快捷命令存在时，直接进入方案一切换目标协议族。
+# 已有 warp-go 且 cf 快捷命令确认为 warp-yg 时，直接进入方案一切换目标协议族。
 backend="warp-go"
-printf '#!/usr/bin/env bash\n' >"$WARP_CF_COMMAND"
+printf '#!/usr/bin/env bash\n# yonggekkk/warp-yg\n' >"$WARP_CF_COMMAND"
 chmod +x "$WARP_CF_COMMAND"
 [[ "$(warp_build_upstream_input 4)" == $'1\n1' ]] || {
     printf '已有 warp-go 时自动菜单序列错误。\n' >&2
     exit 1
 }
 
-# 同时存在两个内核必须拒绝自动部署。
+# 同时存在两个 WARP 后端必须拒绝自动部署。
 backend="both"
 set +e
 warp_build_upstream_input 4 >/dev/null
 status=$?
 set -e
 [[ "$status" -eq 2 ]] || {
-    printf 'warp-go 与 wg-quick 冲突时应返回 2。\n' >&2
+    printf 'warp-go 与 wgcf 冲突时应返回 2。\n' >&2
     exit 1
 }
 
