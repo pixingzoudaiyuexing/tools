@@ -170,8 +170,10 @@ warp_run_upstream_auto() {
         error "warp-yg 上游菜单结构已变化，为避免自动选择错误，已停止部署。"
         return 1
     fi
-    if ! input="$(warp_build_upstream_input "$target_family")"; then
-        status=$?
+
+    input="$(warp_build_upstream_input "$target_family")"
+    status=$?
+    if [[ "$status" -ne 0 ]]; then
         rm -f "$temp_file"
         if [[ "$status" -eq 2 ]]; then
             error "同时检测到 warp-go 与 wg-quick，属于冲突环境，已停止自动部署。"
