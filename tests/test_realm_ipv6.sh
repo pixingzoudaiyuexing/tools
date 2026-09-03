@@ -35,6 +35,8 @@ require_root() { return 0; }
 pause() { :; }
 confirm() { return 0; }
 backup_file() { :; }
+realm_service_installed() { return 0; }
+realm_show_diagnostics() { :; }
 ip() {
     case "$*" in
         '-4 -o addr show scope global') printf '2: ens3    inet 203.0.113.10/24 scope global ens3\n' ;;
@@ -50,18 +52,37 @@ output="$(realm_quick_add <<'INPUT'
 443
 INPUT
 )"
+grep -Fq 'Realm 原配置启动正常' <<<"$output"
 grep -Fq '目标类型：IPv6' <<<"$output"
 grep -Fq '转发链路：双栈中转 → IPv6 落地' <<<"$output"
 grep -Fq '已自动规范化 IPv6：[2001:db8::20]:443' <<<"$output"
 grep -Fq 'listen = "[::]:2443"' "$REALM_CONFIG"
 grep -Fq 'remote = "[2001:db8::20]:443"' "$REALM_CONFIG"
 
-# 新规则导致服务失败时必须恢复添加前的配置。
+# 原配置在修改前就启动失败时，不得修改配置。
+cp "$REALM_CONFIG" "$TEST_DIR/preflight-before.toml"
+realm_restart_service() { return 1; }
+if realm_quick_add <<'INPUT' >/dev/null 2>&1
+3000
+2001:db8::25
+443
+INPUT
+then
+    printf 'Realm 预检失败测试意外返回成功。\n' >&2
+    exit 1
+fi
+cmp -s "$REALM_CONFIG" "$TEST_DIR/preflight-before.toml"
+
+# 新规则导致服务失败时必须恢复添加前的配置：第一次预检成功，第二次新配置失败，第三次回滚后成功。
 cp "$REALM_CONFIG" "$TEST_DIR/before.toml"
 restart_count=0
 realm_restart_service() {
     restart_count=$((restart_count + 1))
-    ((restart_count >= 2))
+    case "$restart_count" in
+        1) return 0 ;;
+        2) return 1 ;;
+        *) return 0 ;;
+    esac
 }
 if realm_quick_add <<'INPUT' >/dev/null 2>&1
 3443
