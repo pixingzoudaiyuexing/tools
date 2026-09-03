@@ -184,7 +184,7 @@ main_menu() {
  9. WARP 网络管理
 10. DDNS 管理
 11. HTTP / SOCKS5 代理
-12. BBRv3 内核 / 网络优化
+12. BBR / BBRv3 网络优化
 13. 流媒体 / 地区解锁检测
 14. TikTok 地区检测
 15. 樱花 VPS IPv6 启用
