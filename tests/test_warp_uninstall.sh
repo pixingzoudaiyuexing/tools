@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_DIR="$(mktemp -d)"
-trap 'rm -rf "$TEST_DIR"' EXIT
+trap 'command rm -rf "$TEST_DIR"' EXIT
 
 # shellcheck source=lib/common.sh
 . "$ROOT/lib/common.sh"
@@ -35,7 +35,7 @@ grep -Fq 'environment-check' "$TEST_DIR/actions"
 grep -Fq '3. 一键卸载所有 WARP' "$ROOT/scripts/warp.sh"
 grep -Fq 'cloudflare-warp' "$ROOT/scripts/warp.sh"
 grep -Fq '不会卸载通用 wireguard-tools' "$ROOT/scripts/warp.sh"
-! grep -Eq 'apt(-get)?[^\n]*(remove|purge)[^\n]*wireguard-tools|yum[^\n]*remove[^\n]*wireguard-tools|dnf[^\n]*remove[^\n]*wireguard-tools' "$ROOT/scripts/warp.sh"
+! grep -Eq 'apt(-get)?.*(remove|purge).*wireguard-tools|yum.*remove.*wireguard-tools|dnf.*remove.*wireguard-tools' "$ROOT/scripts/warp.sh"
 ! grep -Eq 'nft[[:space:]]+flush[[:space:]]+ruleset|iptables[[:space:]]+-F|ip6tables[[:space:]]+-F' "$ROOT/scripts/warp.sh"
 
 printf 'test_warp_uninstall: PASS\n'
