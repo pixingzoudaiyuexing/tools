@@ -70,6 +70,19 @@ realm_local_network_type() {
     fi
 }
 
+realm_service_installed() {
+    if command_exists systemctl; then
+        systemctl cat "$REALM_SERVICE" >/dev/null 2>&1 && return 0
+        systemctl list-unit-files "${REALM_SERVICE}.service" --no-legend 2>/dev/null | grep -q "^${REALM_SERVICE}\.service" && return 0
+        return 1
+    fi
+    if command_exists rc-service; then
+        [[ -x "/etc/init.d/${REALM_SERVICE}" ]]
+        return $?
+    fi
+    return 1
+}
+
 realm_restart_service() {
     if command_exists systemctl; then
         systemctl restart "$REALM_SERVICE" || return 1
@@ -85,6 +98,25 @@ realm_restart_service() {
     return 1
 }
 
+realm_show_diagnostics() {
+    printf '\n[Realm 诊断信息]\n'
+    printf '二进制：%s\n' "$REALM_BIN"
+    printf '配置文件：%s\n' "$REALM_CONFIG"
+    printf '服务名：%s\n' "$REALM_SERVICE"
+    if command_exists systemctl; then
+        printf '\n[服务状态]\n'
+        systemctl status "$REALM_SERVICE" --no-pager -l -n 30 2>&1 || true
+        printf '\n[最近日志]\n'
+        journalctl -u "$REALM_SERVICE" -n 60 --no-pager 2>&1 || true
+        printf '\n[服务定义]\n'
+        systemctl cat "$REALM_SERVICE" 2>&1 || true
+    elif command_exists rc-service; then
+        printf '\n[服务状态]\n'
+        rc-service "$REALM_SERVICE" status 2>&1 || true
+    fi
+    printf '\n'
+}
+
 realm_rule_exists() {
     local port="$1"
     [[ -f "$REALM_CONFIG" ]] || return 1
@@ -98,6 +130,20 @@ realm_quick_ready() {
         info "请先选择“启动 Realm 完整管理脚本”，执行一次安装 / 重置 Realm。"
         return 1
     fi
+    if ! realm_service_installed; then
+        error "检测到 Realm 二进制和配置，但没有找到 ${REALM_SERVICE} 服务。"
+        info "请先进入 Realm 完整管理脚本执行“安装 / 重置 Realm”，补齐服务文件。"
+        realm_show_diagnostics
+        return 1
+    fi
+
+    info "正在检查修改前的 Realm 服务状态..."
+    if ! realm_restart_service; then
+        error "当前 Realm 使用原配置就无法正常启动，已取消快速添加；配置文件没有被修改。"
+        realm_show_diagnostics
+        return 1
+    fi
+    success "Realm 原配置启动正常，可以安全添加新规则。"
 }
 
 realm_quick_add() {
@@ -164,8 +210,10 @@ EOF
     rm -f "$rollback"
     if realm_restart_service; then
         error "新规则导致 Realm 启动失败，已恢复添加前的配置。"
+        realm_show_diagnostics
     else
-        error "新规则失败后已恢复配置，但 Realm 服务仍未正常启动，请检查日志。"
+        error "新规则失败后已恢复配置，但 Realm 服务仍未正常启动。"
+        realm_show_diagnostics
     fi
     pause
     return "$status"
@@ -190,7 +238,8 @@ module_main() {
 - 双栈中转 → 纯 IPv6 落地
 - IPv4 / IPv6 / 域名目标
 - 裸 IPv6 自动补 [ ]
-- 新规则失败自动恢复原配置
+- 添加前检查原 Realm 服务是否正常
+- 新规则失败自动恢复原配置并显示诊断日志
 
 完整管理脚本负责 Realm 安装、删除、端口段、服务、日志和面板管理。
 TEXT
