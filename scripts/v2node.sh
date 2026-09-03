@@ -13,21 +13,38 @@ v2node_prepare() {
     python3 -m json.tool "$V2NODE_CONFIG" >/dev/null || { error "现有配置不是有效 JSON。"; return 1; }
 }
 
-v2node_list() {
+v2node_ids() {
     python3 - "$V2NODE_CONFIG" <<'PY'
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as handle:
     nodes = json.load(handle).get("Nodes", [])
-if not nodes:
-    print("当前节点：无")
-for node in nodes:
-    print(f"Node ID: {node.get('NodeID')}")
+ids = [str(node.get("NodeID")) for node in nodes if node.get("NodeID") is not None]
+print(", ".join(ids))
 PY
 }
 
+v2node_list() {
+    local ids
+    ids="$(v2node_ids)" || return 1
+    if [[ -n "$ids" ]]; then
+        printf '现有节点 ID：%s\n' "$ids"
+    else
+        printf '现有节点 ID：无\n'
+    fi
+}
+
 v2node_change() {
-    local action="$1" node_id status rollback
-    read -r -p "请输入节点 ID: " node_id
+    local action="$1" node_id status rollback prompt
+
+    printf '\n'
+    v2node_list || return 1
+    printf '\n'
+    case "$action" in
+        add) prompt="请输入要添加的节点 ID: " ;;
+        delete) prompt="请输入要删除的节点 ID: " ;;
+        *) error "未知操作：$action"; return 1 ;;
+    esac
+    read -r -p "$prompt" node_id
     validate_positive_integer "$node_id" || { error "节点 ID 必须是正整数。"; return 1; }
     backup_file "$V2NODE_CONFIG" || return 1
     rollback="$(mktemp)" || return 1
