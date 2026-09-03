@@ -3,6 +3,18 @@
 WARP_UPSTREAM_URL="https://raw.githubusercontent.com/yonggekkk/warp-yg/main/CFwarp.sh"
 WARP_CF_COMMAND="${WARP_CF_COMMAND:-/usr/bin/cf}"
 
+warp_has_warp_go() {
+    [[ -s /usr/local/bin/warp.conf ]] && { command_exists warp-go || [[ -x /usr/local/bin/warp-go || -x /usr/bin/warp-go ]]; }
+}
+
+warp_has_wgcf() {
+    [[ -s /etc/wireguard/wgcf.conf ]]
+}
+
+warp_has_cf_launcher() {
+    [[ -x "$WARP_CF_COMMAND" ]] && grep -Fq 'warp-yg' "$WARP_CF_COMMAND" 2>/dev/null
+}
+
 warp_native_address() {
     local family="$1" line iface address
     while read -r line; do
@@ -77,8 +89,8 @@ warp_environment() {
     printf '公网 IPv6：%s\n' "${ipv6:-未检测到}"
     printf 'IPv4 WARP：%s\n' "$state4"
     printf 'IPv6 WARP：%s\n' "$state6"
-    printf 'warp-go：%s\n' "$(command_exists warp-go && printf '已安装' || printf '未安装')"
-    printf 'wgcf：%s\n' "$(command_exists wgcf && printf '已安装' || printf '未安装')"
+    printf 'warp-go：%s\n' "$(warp_has_warp_go && printf '已安装' || printf '未安装')"
+    printf 'wgcf：%s\n' "$(warp_has_wgcf && printf '已安装' || printf '未安装')"
     printf 'WireGuard 接口：\n'
     ip -brief link show type wireguard 2>/dev/null || printf '  未检测到\n'
 }
@@ -133,17 +145,17 @@ warp_build_upstream_input() {
         *) return 1 ;;
     esac
 
-    if command_exists warp-go && command_exists wg-quick; then
+    if warp_has_warp_go && warp_has_wgcf; then
         return 2
-    elif command_exists warp-go; then
+    elif warp_has_warp_go; then
         backend_choice=3
-    elif command_exists wg-quick; then
+    elif warp_has_wgcf; then
         backend_choice=2
     else
         backend_choice=3
     fi
 
-    if [[ -x "$WARP_CF_COMMAND" ]]; then
+    if warp_has_cf_launcher; then
         printf '1\n%s\n' "$mode_choice"
     else
         printf '%s\n1\n%s\n' "$backend_choice" "$mode_choice"
@@ -171,12 +183,15 @@ warp_run_upstream_auto() {
         return 1
     fi
 
-    input="$(warp_build_upstream_input "$target_family")"
-    status=$?
+    if input="$(warp_build_upstream_input "$target_family")"; then
+        status=0
+    else
+        status=$?
+    fi
     if [[ "$status" -ne 0 ]]; then
         rm -f "$temp_file"
         if [[ "$status" -eq 2 ]]; then
-            error "同时检测到 warp-go 与 wg-quick，属于冲突环境，已停止自动部署。"
+            error "同时检测到 warp-go 与 wgcf，属于冲突环境，已停止自动部署。"
         else
             error "无法生成 warp-yg 自动部署参数。"
         fi
@@ -220,8 +235,8 @@ warp_auto_add_family() {
         return 0
     fi
 
-    if command_exists warp-go && command_exists wg-quick; then
-        error "同时检测到 warp-go 与 wg-quick。为避免自动修改冲突路由，请先使用“旧 WARP 配置检查 / 保守修复”。"
+    if warp_has_warp_go && warp_has_wgcf; then
+        error "同时检测到 warp-go 与 wgcf。为避免自动修改冲突路由，请先使用“旧 WARP 配置检查 / 保守修复”。"
         return 1
     fi
 
