@@ -156,10 +156,11 @@ EOF
         printf '访问中转机端口 %s 的流量将转发到 %s。\n' "$listen_port" "$remote"
         pause
         return 0
+    else
+        status=$?
     fi
 
-    status=$?
-    install -m 0600 "$rollback" "$REALM_CONFIG"
+    cp -a -- "$rollback" "$REALM_CONFIG"
     rm -f "$rollback"
     if realm_restart_service; then
         error "新规则导致 Realm 启动失败，已恢复添加前的配置。"
@@ -167,7 +168,7 @@ EOF
         error "新规则失败后已恢复配置，但 Realm 服务仍未正常启动，请检查日志。"
     fi
     pause
-    return "${status:-1}"
+    return "$status"
 }
 
 realm_upstream() {
