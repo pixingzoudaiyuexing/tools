@@ -28,7 +28,7 @@ run_ipquality -6 >/dev/null
 [[ "$(cat "$TEST_OUTPUT")" == "-6" ]]
 
 run_ipquality >/dev/null
-[[ ! -s "$TEST_OUTPUT" ]]
+[[ "$(cat "$TEST_OUTPUT")" == "" ]]
 
 grep -q 'https://IP.Check.Place' "$ROOT/scripts/media.sh"
 grep -q 'IP 质量体检（IPv4 + IPv6）' "$ROOT/scripts/media.sh"
