@@ -62,7 +62,8 @@ tools
 - WARP 自动快捷项只允许在真实纯 IPv4 / 纯 IPv6 网络上执行；双栈机器会直接拒绝。若同时检测到 warp-go 与 WGCF 配置，也会停止自动部署，避免盲目修改路由。首次安装默认使用 WARP-GO；若已经存在单一 WARP 后端，则尽量沿用现有后端。WARP 一键卸载不会删除通用 `wireguard-tools`，也不会执行全局 iptables / nftables 清空。
 - DDNS-GO：Cloudflare、华为云、阿里云、DNSPod，A/AAAA 可分别启用，本地 `-noweb` 服务。
 - 3proxy Docker：带认证的 HTTP / SOCKS5 代理安装、修改、启停、升级和卸载。
-- BBRv3、流媒体解锁、TikTok 地区检测入口。
+- BBR / BBRv3：12 号菜单提供“快速开启 BBR + FQ”，选择后直接使用当前内核已有 BBR 自动设置 `net.ipv4.tcp_congestion_control=bbr` 和 `net.core.default_qdisc=fq`，写入独立 sysctl 持久化配置并验证状态，不需要再进入上游分级菜单；若当前内核没有 BBR，则提示使用保留的 Actions-bbr-v3 完整管理脚本。
+- 流媒体解锁、TikTok 地区检测入口。
 - 樱花 VPS Debian 12 预置 IPv6 精确启用和验证。
 - 樱花 VPS 基础环境修复：`apt-get update`、重新安装 `openssl` / `ca-certificates`、安装 `curl` / `wget` 并刷新 CA 证书。
 
@@ -97,6 +98,7 @@ tools
 - VPS Tools 自身的确认提示统一使用 `[Y/n]`：直接回车表示 Yes，只有明确输入 `n` / `N` 才取消。
 - 高风险操作仍会显示明确警告，但不要求输入特殊确认字符串。
 - Realm glibc 兼容修复只替换 Realm 自己的二进制并保留备份，不会安装、升级或替换系统 `glibc` / `libc6`。
+- BBR + FQ 快捷项不会安装或切换内核，只操作当前内核已有的拥塞控制和默认队列；使用独立 `/etc/sysctl.d/99-vps-tools-bbr-fq.conf` 持久化，应用失败时恢复修改前的运行参数和原配置文件。
 - WARP 两个自动快捷项在用户选择后不再二次询问；因此会先严格验证机器确实是纯 IPv4 或纯 IPv6，并检查冲突后端和上游菜单结构，任何一项不符合都会停止而不是猜测执行。
 - WARP 一键卸载会先显示 `[Y/n]` 确认，然后自动完成后续清理；不会卸载通用 WireGuard 软件包，也不会清空用户已有的 iptables / nftables 规则。
 - 端口跳跃只创建 `table ip vps_tools_porthop` 和 `table ip6 vps_tools_porthop`，不会执行 `nft flush ruleset`，不会清空其他防火墙。
@@ -140,4 +142,4 @@ bash <(curl -fsSL https://raw.githubusercontent.com/pixingzoudaiyuexing/tools/ma
 tests/run.sh
 ```
 
-测试会执行全部 Shell 语法检查，以及公共校验、V2Node fixture、DDNS YAML、nftables 规则生成、下载/CA 环境修复、REALITY web443 入口、Realm IPv6 快速转发、Realm glibc 兼容修复、WARP 自动快捷项、WARP 一键卸载和危险命令静态测试；不会真实修改开发机的 SSH、防火墙、Swap、Docker、systemd 或执行重装。
+测试会执行全部 Shell 语法检查，以及公共校验、V2Node fixture、DDNS YAML、nftables 规则生成、下载/CA 环境修复、REALITY web443 入口、Realm IPv6 快速转发、Realm glibc 兼容修复、BBR + FQ 快捷开启、WARP 自动快捷项、WARP 一键卸载和危险命令静态测试；不会真实修改开发机的 SSH、防火墙、Swap、Docker、systemd 或执行重装。
