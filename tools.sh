@@ -201,6 +201,9 @@ main_menu() {
 [Docker]
 23. Docker 管理
 
+[诊断]
+24. 服务器首次启动时间检测
+
 [工具箱]
 98. 安装 tools 快捷命令
 99. 查看工具箱信息
@@ -232,6 +235,7 @@ MENU
             21) load_module temp-ssh-key ;;
             22) load_module reinstall ;;
             23) load_module docker ;;
+            24) load_module server-birth ;;
             98) install_shortcut; pause ;;
             99) show_info ;;
             0) success "已退出。"; return 0 ;;
