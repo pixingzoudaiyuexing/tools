@@ -75,6 +75,7 @@ tools
 - Root SSH 密码登录：仅写入 `/etc/ssh/sshd_config.d/00-vps-tools-root.conf`，修改前后执行 `sshd -t` 并验证实际生效配置。
 - Root 临时 Ed25519 密钥：1 小时、6 小时、24 小时、7 天或永久，systemd timer 负责真正到期失效。
 - bin456789/reinstall 系统重装入口。
+- 服务器首次启动时间检测：24 号菜单直接执行只读诊断，汇总当前启动、systemd boot 历史、最早 Journal、wtmp/reboot、根文件系统创建时间、Cloud-init 首次/历史记录、云厂商数据源、Instance ID 和 machine-id 时间；综合判断优先参考 Cloud-init，并自动给出北京时间。快照、克隆、自定义镜像或迁移可能使该时间早于当前实例实际购买时间。
 
 ### Docker
 
@@ -106,6 +107,7 @@ tools
 - 临时 SSH 密钥只删除带唯一 `vps-tools-temp-*` ID 的公钥行；私钥只显示一次，随后立即从服务器删除。
 - DDNS 凭证、AppleID API Key 和代理密码只在 VPS 本地交互输入和保存，不写入 GitHub。敏感配置权限为 `600`。
 - DDNS 检测到 IPv4 `warp=on` 时，不会默认把 WARP 出口作为 A 记录，而会要求选择真实 IPv4 网卡。
+- 服务器首次启动时间检测保持只读，不写入 `/root`，不修改 systemd、Journal、Cloud-init、文件系统或任何系统配置。
 - 修改重要系统配置前会在 `/etc/vps-tools/` 相应目录下创建备份。
 
 运行 Root SSH、WARP、nftables、Docker 删除、内核安装或系统重装前，请确保有 VPS 控制台、救援模式和可用备份。
@@ -142,4 +144,4 @@ bash <(curl -fsSL https://raw.githubusercontent.com/pixingzoudaiyuexing/tools/ma
 tests/run.sh
 ```
 
-测试会执行全部 Shell 语法检查，以及公共校验、V2Node fixture、DDNS YAML、nftables 规则生成、下载/CA 环境修复、REALITY web443 入口、Realm IPv6 快速转发、Realm glibc 兼容修复、BBR + FQ 快捷开启、WARP 自动快捷项、WARP 一键卸载和危险命令静态测试；不会真实修改开发机的 SSH、防火墙、Swap、Docker、systemd 或执行重装。
+测试会执行全部 Shell 语法检查，以及公共校验、V2Node fixture、DDNS YAML、nftables 规则生成、下载/CA 环境修复、REALITY web443 入口、Realm IPv6 快速转发、Realm glibc 兼容修复、BBR + FQ 快捷开启、WARP 自动快捷项、WARP 一键卸载、服务器首次启动时间只读约束和危险命令静态测试；不会真实修改开发机的 SSH、防火墙、Swap、Docker、systemd 或执行重装。
