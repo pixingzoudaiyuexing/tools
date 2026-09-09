@@ -5,94 +5,100 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_DIR="$(mktemp -d)"
 trap 'rm -rf "$TEST_DIR"' EXIT
 
-export REALM_CONFIG="$TEST_DIR/config.toml"
-export REALM_BIN="$TEST_DIR/realm"
-export REALM_SERVICE="realm-test"
-export VPS_TOOLS_ETC="$TEST_DIR/etc"
-
-cat >"$REALM_CONFIG" <<'EOF'
-[network]
-no_tcp = false
-use_udp = true
-EOF
-printf '#!/usr/bin/env bash\nexit 0\n' >"$REALM_BIN"
-chmod +x "$REALM_BIN"
+export VPS_TOOLS_ETC="$TEST_DIR/vps-tools"
+export REALM_CONFIG="$TEST_DIR/etc/realm/config.toml"
+export REALM_BIN="$TEST_DIR/usr/local/bin/realm"
+export REALM_SERVICE_FILE="$TEST_DIR/etc/systemd/system/realm.service"
+export REALM_LEGACY_CONFIG="$TEST_DIR/root/.realm/config.toml"
+export REALM_LEGACY_BIN="$TEST_DIR/root/realm/realm"
 
 # shellcheck source=lib/common.sh
 . "$ROOT/lib/common.sh"
 # shellcheck source=scripts/realm.sh
 . "$ROOT/scripts/realm.sh"
 
-[[ "$(realm_format_remote '2001:db8::1234' 443)" == '[2001:db8::1234]:443' ]]
-[[ "$(realm_format_remote '[2001:db8::1234]' 443)" == '[2001:db8::1234]:443' ]]
-[[ "$(realm_format_remote '203.0.113.8' 443)" == '203.0.113.8:443' ]]
-[[ "$(realm_format_remote 'node.example.com' 443)" == 'node.example.com:443' ]]
-[[ "$(realm_target_type '2001:db8::1234')" == 'IPv6' ]]
-[[ "$(realm_target_type '203.0.113.8')" == 'IPv4' ]]
-[[ "$(realm_target_type 'node.example.com')" == '域名' ]]
+[[ "$(realm_target_type '2607:5300:60:2288:29::a')" == "IPv6" ]]
+[[ "$(realm_target_type '1.1.1.1')" == "IPv4" ]]
+[[ "$(realm_target_type 'example.com')" == "域名" ]]
+[[ "$(realm_format_remote '2607:5300:60:2288:29::a' 50036)" == '[2607:5300:60:2288:29::a]:50036' ]]
+[[ "$(realm_format_remote '[2607:5300:60:2288:29::a]' 50036)" == '[2607:5300:60:2288:29::a]:50036' ]]
+[[ "$(realm_listen_address 1 54545)" == '0.0.0.0:54545' ]]
+[[ "$(realm_listen_address 2 54545)" == '[::]:54545' ]]
+[[ "$(realm_listen_address 3 54545)" == '[::]:54545' ]]
 
-require_root() { return 0; }
-pause() { :; }
-confirm() { return 0; }
-backup_file() { :; }
-realm_service_installed() { return 0; }
-realm_show_diagnostics() { :; }
-ip() {
-    case "$*" in
-        '-4 -o addr show scope global') printf '2: ens3    inet 203.0.113.10/24 scope global ens3\n' ;;
-        '-6 -o addr show scope global') printf '2: ens3    inet6 2001:db8::10/64 scope global\n' ;;
-        *) return 0 ;;
-    esac
-}
-realm_restart_service() { return 0; }
+mkdir -p "$(dirname "$REALM_CONFIG")"
+cat >"$REALM_CONFIG" <<'CFG'
+[network]
+no_tcp = false
+use_udp = true
 
-output="$(realm_quick_add <<'INPUT'
-2443
-2001:db8::20
-443
-INPUT
-)"
-grep -Fq 'Realm 原配置启动正常' <<<"$output"
-grep -Fq '目标类型：IPv6' <<<"$output"
-grep -Fq '转发链路：双栈中转 → IPv6 落地' <<<"$output"
-grep -Fq '已自动规范化 IPv6：[2001:db8::20]:443' <<<"$output"
-grep -Fq 'listen = "[::]:2443"' "$REALM_CONFIG"
-grep -Fq 'remote = "[2001:db8::20]:443"' "$REALM_CONFIG"
+[[endpoints]]
+listen = "0.0.0.0:54545"
+remote = "[2607:5300:60:2288:29::a]:50036"
 
-# 原配置在修改前就启动失败时，不得修改配置。
-cp "$REALM_CONFIG" "$TEST_DIR/preflight-before.toml"
-realm_restart_service() { return 1; }
-if realm_quick_add <<'INPUT' >/dev/null 2>&1
-3000
-2001:db8::25
-443
-INPUT
-then
-    printf 'Realm 预检失败测试意外返回成功。\n' >&2
+[[endpoints]]
+listen = "[::]:60000"
+remote = "1.1.1.1:443"
+[endpoints.network]
+ipv6_only = false
+
+[log]
+level = "warn"
+CFG
+
+[[ "$(realm_rule_count)" == "2" ]]
+realm_port_in_config 54545
+realm_port_in_config 60000
+if realm_port_in_config 12345; then
+    printf '不存在的 Realm 端口被误判为已存在。\n' >&2
     exit 1
 fi
-cmp -s "$REALM_CONFIG" "$TEST_DIR/preflight-before.toml"
 
-# 新规则导致服务失败时必须恢复添加前的配置：第一次预检成功，第二次新配置失败，第三次回滚后成功。
-cp "$REALM_CONFIG" "$TEST_DIR/before.toml"
-restart_count=0
-realm_restart_service() {
-    restart_count=$((restart_count + 1))
-    case "$restart_count" in
-        1) return 0 ;;
-        2) return 1 ;;
-        *) return 0 ;;
-    esac
-}
-if realm_quick_add <<'INPUT' >/dev/null 2>&1
-3443
-2001:db8::30
-443
-INPUT
-then
-    printf 'Realm 失败回滚测试意外返回成功。\n' >&2
+RULES="$(realm_rule_lines)"
+grep -q '^1|0.0.0.0:54545|\[2607:5300:60:2288:29::a\]:50036$' <<<"$RULES"
+grep -q '^2|\[::\]:60000|1.1.1.1:443$' <<<"$RULES"
+
+CANDIDATE="$TEST_DIR/candidate.toml"
+realm_build_config_without_rule "$REALM_CONFIG" 2 "$CANDIDATE"
+grep -q '0.0.0.0:54545' "$CANDIDATE"
+if grep -q '\[::\]:60000' "$CANDIDATE"; then
+    printf '删除 Realm 规则时目标 endpoint 未被删除。\n' >&2
     exit 1
 fi
-cmp -s "$REALM_CONFIG" "$TEST_DIR/before.toml"
+grep -q '^\[log\]$' "$CANDIDATE"
+grep -q '^level = "warn"$' "$CANDIDATE"
 
-printf 'test_realm_ipv6: PASS\n'
+APPEND="$TEST_DIR/append.toml"
+cp "$REALM_CONFIG" "$APPEND"
+realm_append_endpoint "$APPEND" 2 '[::]:61000' '[2001:db8::1]:443'
+grep -q 'listen = "\[::\]:61000"' "$APPEND"
+grep -A1 '^\[endpoints.network\]$' "$APPEND" | grep -q 'ipv6_only = false'
+
+# 旧配置只迁移到新标准路径，不沿用旧二进制。
+rm -f "$REALM_CONFIG"
+mkdir -p "$(dirname "$REALM_LEGACY_CONFIG")"
+cat >"$REALM_LEGACY_CONFIG" <<'LEGACY'
+[network]
+no_tcp = false
+use_udp = true
+[[endpoints]]
+listen = "0.0.0.0:10000"
+remote = "1.1.1.1:443"
+LEGACY
+realm_prepare_config >/dev/null
+cmp -s "$REALM_LEGACY_CONFIG" "$REALM_CONFIG"
+
+realm_write_service_file
+grep -q "^ExecStart=${REALM_BIN} -c ${REALM_CONFIG}$" "$REALM_SERVICE_FILE"
+grep -q '^Restart=on-failure$' "$REALM_SERVICE_FILE"
+
+SCRIPT="$ROOT/scripts/realm.sh"
+grep -q 'zhboner/realm' "$SCRIPT"
+grep -q '/usr/local/bin/realm' "$SCRIPT"
+grep -q '/etc/realm/config.toml' "$SCRIPT"
+if grep -Eq 'wcwq98|wcwq99|REALM_UPSTREAM_URL|run_remote_bash' "$SCRIPT"; then
+    printf 'Realm 模块不应再依赖第三方管理脚本。\n' >&2
+    exit 1
+fi
+
+printf 'Realm 官方自维护 IPv4 / IPv6 与迁移测试通过。\n'
