@@ -166,6 +166,7 @@ realm_service_active() {
 
 realm_start_service() {
     realm_require_systemd || return 1
+    systemctl enable "$REALM_SERVICE" >/dev/null 2>&1 || true
     systemctl start "$REALM_SERVICE" || return 1
     systemctl is-active --quiet "$REALM_SERVICE"
 }
@@ -177,6 +178,7 @@ realm_stop_service() {
 
 realm_restart_service() {
     realm_require_systemd || return 1
+    systemctl enable "$REALM_SERVICE" >/dev/null 2>&1 || true
     systemctl restart "$REALM_SERVICE" || return 1
     systemctl is-active --quiet "$REALM_SERVICE"
 }
@@ -293,6 +295,11 @@ realm_rule_lines() {
         inside && /^[[:space:]]*remote[[:space:]]*=/ {
             line=$0; sub(/^[^=]*=[[:space:]]*"/, "", line); sub(/"[[:space:]]*$/, "", line); remote=line; next
         }
+        inside && /^[[:space:]]*\[[^[]/ && $0 !~ /^[[:space:]]*\[endpoints\./ {
+            print idx "|" listen "|" remote
+            inside=0
+            next
+        }
         END { if (inside) print idx "|" listen "|" remote }
     ' "$REALM_CONFIG"
 }
@@ -321,8 +328,34 @@ realm_port_in_config() {
     return 1
 }
 
+realm_restore_install_state() {
+    local had_bin="$1" rollback_bin="$2" had_unit="$3" rollback_unit="$4"
+    local created_config="$5" was_active="$6" was_enabled="$7"
+
+    realm_stop_service
+    if [[ "$had_bin" -eq 1 && -f "$rollback_bin" ]]; then
+        cp -a -- "$rollback_bin" "$REALM_BIN" || true
+    else
+        rm -f "$REALM_BIN"
+    fi
+    if [[ "$had_unit" -eq 1 && -f "$rollback_unit" ]]; then
+        cp -a -- "$rollback_unit" "$REALM_SERVICE_FILE" || true
+    else
+        rm -f "$REALM_SERVICE_FILE"
+    fi
+    [[ "$created_config" -eq 1 ]] && rm -f "$REALM_CONFIG"
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    if [[ "$was_enabled" -eq 1 ]]; then
+        systemctl enable "$REALM_SERVICE" >/dev/null 2>&1 || true
+    else
+        systemctl disable "$REALM_SERVICE" >/dev/null 2>&1 || true
+    fi
+    [[ "$was_active" -eq 1 ]] && systemctl start "$REALM_SERVICE" >/dev/null 2>&1 || true
+}
+
 realm_install_or_repair() {
-    local temp_dir rollback_bin rollback_unit="" had_bin=0 had_unit=0 created_config=0 was_active=0 rules
+    local temp_dir rollback_bin rollback_unit="" had_bin=0 had_unit=0 created_config=0
+    local was_active=0 was_enabled=0 rules
     require_root || return 1
     realm_require_systemd || return 1
     ensure_download_environment || return 1
@@ -334,6 +367,7 @@ realm_install_or_repair() {
     realm_download_official_binary "$temp_dir" || { rm -rf "$temp_dir"; return 1; }
 
     realm_service_active && was_active=1
+    systemctl is-enabled --quiet "$REALM_SERVICE" 2>/dev/null && was_enabled=1
     if [[ -x "$REALM_BIN" ]]; then
         had_bin=1
         cp -a -- "$REALM_BIN" "$rollback_bin" || { rm -rf "$temp_dir"; return 1; }
@@ -350,22 +384,34 @@ realm_install_or_repair() {
     else
         backup_file "$REALM_CONFIG" "$VPS_TOOLS_ETC/backups/realm" || { rm -rf "$temp_dir"; return 1; }
     fi
-    realm_prepare_config || { rm -rf "$temp_dir"; return 1; }
+    if ! realm_prepare_config; then
+        [[ "$created_config" -eq 1 ]] && rm -f "$REALM_CONFIG"
+        rm -rf "$temp_dir"
+        return 1
+    fi
 
     realm_stop_service
-    mkdir -p "$(dirname "$REALM_BIN")" || { rm -rf "$temp_dir"; return 1; }
-    install -m 0755 "$REALM_DOWNLOAD_CANDIDATE" "$REALM_BIN" || { rm -rf "$temp_dir"; return 1; }
+    if ! mkdir -p "$(dirname "$REALM_BIN")"; then
+        realm_restore_install_state "$had_bin" "$rollback_bin" "$had_unit" "$rollback_unit" "$created_config" "$was_active" "$was_enabled"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+    if ! install -m 0755 "$REALM_DOWNLOAD_CANDIDATE" "$REALM_BIN"; then
+        realm_restore_install_state "$had_bin" "$rollback_bin" "$had_unit" "$rollback_unit" "$created_config" "$was_active" "$was_enabled"
+        rm -rf "$temp_dir"
+        return 1
+    fi
     if ! realm_write_service_file; then
-        [[ "$had_bin" -eq 1 ]] && cp -a -- "$rollback_bin" "$REALM_BIN" || rm -f "$REALM_BIN"
+        realm_restore_install_state "$had_bin" "$rollback_bin" "$had_unit" "$rollback_unit" "$created_config" "$was_active" "$was_enabled"
         rm -rf "$temp_dir"
         return 1
     fi
     systemctl daemon-reload || true
-    systemctl enable "$REALM_SERVICE" >/dev/null 2>&1 || true
 
     rules="$(realm_rule_count)"
     if [[ "$rules" -eq 0 ]]; then
-        success "Realm 官方版安装完成；当前没有转发规则，服务保持停止。"
+        systemctl disable "$REALM_SERVICE" >/dev/null 2>&1 || true
+        success "Realm 官方版安装完成；当前没有转发规则，服务保持停止且未设为开机启动。"
         printf '版本：%s\n构建：%s\n二进制：%s\n配置：%s\n' \
             "$(realm_version_output 2>/dev/null || printf '未知')" "$REALM_DOWNLOAD_ASSET" "$REALM_BIN" "$REALM_CONFIG"
         rm -rf "$temp_dir"
@@ -383,12 +429,7 @@ realm_install_or_repair() {
     fi
 
     error "新 Realm 未能正常启动，正在恢复安装前状态。"
-    realm_stop_service
-    [[ "$had_bin" -eq 1 ]] && cp -a -- "$rollback_bin" "$REALM_BIN" || rm -f "$REALM_BIN"
-    [[ "$had_unit" -eq 1 ]] && cp -a -- "$rollback_unit" "$REALM_SERVICE_FILE" || rm -f "$REALM_SERVICE_FILE"
-    [[ "$created_config" -eq 1 ]] && rm -f "$REALM_CONFIG"
-    systemctl daemon-reload || true
-    [[ "$was_active" -eq 1 ]] && systemctl start "$REALM_SERVICE" >/dev/null 2>&1 || true
+    realm_restore_install_state "$had_bin" "$rollback_bin" "$had_unit" "$rollback_unit" "$created_config" "$was_active" "$was_enabled"
     realm_show_diagnostics
     rm -rf "$temp_dir"
     return 1
@@ -433,19 +474,23 @@ EOF_ENDPOINT
 }
 
 realm_apply_candidate_config() {
-    local candidate="$1" start_if_stopped="${2:-0}" rollback was_active=0 status=0
+    local candidate="$1" start_if_stopped="${2:-0}" rollback was_active=0 status=0 candidate_rules
     [[ -f "$candidate" ]] || return 1
     backup_file "$REALM_CONFIG" "$VPS_TOOLS_ETC/backups/realm" || return 1
     rollback="$(mktemp)" || return 1
     cp -a -- "$REALM_CONFIG" "$rollback" || { rm -f "$rollback"; return 1; }
     realm_service_active && was_active=1
     cp -a -- "$candidate" "$REALM_CONFIG" || { rm -f "$rollback"; return 1; }
+    candidate_rules="$(realm_rule_count)"
 
-    if [[ "$was_active" -eq 1 ]]; then
+    if [[ "$candidate_rules" -eq 0 ]]; then
+        [[ "$was_active" -eq 1 ]] && realm_stop_service
+        systemctl disable "$REALM_SERVICE" >/dev/null 2>&1 || true
+    elif [[ "$was_active" -eq 1 ]]; then
         realm_restart_service || status=$?
     else
         realm_validate_config_file "$REALM_CONFIG" "$REALM_BIN" || status=$?
-        if [[ "$status" -eq 0 && "$start_if_stopped" -eq 1 && "$(realm_rule_count)" -gt 0 ]]; then
+        if [[ "$status" -eq 0 && "$start_if_stopped" -eq 1 ]]; then
             realm_start_service || status=$?
         fi
     fi
@@ -455,6 +500,7 @@ realm_apply_candidate_config() {
     fi
 
     error "新配置未通过 Realm 运行验证，正在恢复原配置。"
+    realm_stop_service
     cp -a -- "$rollback" "$REALM_CONFIG"
     rm -f "$rollback"
     [[ "$was_active" -eq 1 ]] && realm_restart_service >/dev/null 2>&1 || true
@@ -666,7 +712,12 @@ realm_update() {
     backup_file "$REALM_BIN" "$VPS_TOOLS_ETC/backups/realm" || { rm -rf "$temp_dir"; return 1; }
     realm_service_active && was_active=1
     realm_stop_service
-    install -m 0755 "$REALM_DOWNLOAD_CANDIDATE" "$REALM_BIN" || { cp -a -- "$rollback" "$REALM_BIN"; rm -rf "$temp_dir"; return 1; }
+    if ! install -m 0755 "$REALM_DOWNLOAD_CANDIDATE" "$REALM_BIN"; then
+        cp -a -- "$rollback" "$REALM_BIN"
+        [[ "$was_active" -eq 1 ]] && systemctl start "$REALM_SERVICE" >/dev/null 2>&1 || true
+        rm -rf "$temp_dir"
+        return 1
+    fi
 
     if [[ "$was_active" -eq 1 ]]; then
         if ! realm_restart_service; then
