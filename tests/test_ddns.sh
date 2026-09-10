@@ -22,7 +22,7 @@ v6.example.com
 INPUT
 
 ruby -e 'require "yaml"; data=YAML.safe_load(File.read(ARGV[0])); abort unless data["dnsconf"][0]["ipv6"]["enable"] == true; abort unless data["dnsconf"][0]["dns"]["name"] == "cloudflare"' "$DDNS_CONFIG"
-[[ "$(stat -f '%Lp' "$DDNS_CONFIG" 2>/dev/null || stat -c '%a' "$DDNS_CONFIG")" == "600" ]]
+[[ "$(stat -c '%a' "$DDNS_CONFIG" 2>/dev/null || stat -f '%Lp' "$DDNS_CONFIG")" == "600" ]]
 grep -Fq 'notallowwanaccess: true' "$DDNS_CONFIG"
 
 printf 'test_ddns: PASS\n'
