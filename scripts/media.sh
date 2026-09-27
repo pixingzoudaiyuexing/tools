@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 IPQUALITY_URL="https://IP.Check.Place"
-MEDIA_CHECK_URL="https://check.unlock.media"
+MEDIA_CHECK_URL="https://raw.githubusercontent.com/lmc999/RegionRestrictionCheck/main/check.sh"
 
 run_ipquality() {
     local mode="${1:-}" temp_file status
@@ -28,8 +28,8 @@ run_media_check() {
     ensure_download_environment || return 1
     temp_file="$(mktemp)" || { error "无法创建临时文件。"; return 1; }
 
-    info "即将按上游官方入口加载最新版：lmc999/RegionRestrictionCheck"
-    if ! curl -L -sS --retry 2 --retry-delay 2 -o "$temp_file" "$MEDIA_CHECK_URL"; then
+    info "即将从上游官方 GitHub 仓库加载最新版：lmc999/RegionRestrictionCheck"
+    if ! download_file "$MEDIA_CHECK_URL" "$temp_file"; then
         error "流媒体检测脚本下载失败：$MEDIA_CHECK_URL"
         rm -f "$temp_file"
         return 1
@@ -60,7 +60,7 @@ module_main() {
 说明：
 - IP 质量体检使用 xykt/IPQuality（IP.Check.Place）。
 - 默认双栈检测；也可强制只检测 IPv4 或 IPv6。
-- 流媒体检测每次按 lmc999/RegionRestrictionCheck 官方入口实时拉取最新版。
+- 流媒体检测每次直接从 lmc999/RegionRestrictionCheck 官方 GitHub main 分支拉取最新版，避免 check.unlock.media 入口故障。
 TEXT
         printf '\n'
         read -r -p "请选择: " choice
