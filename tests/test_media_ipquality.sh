@@ -35,5 +35,7 @@ grep -q 'IP 质量体检（IPv4 + IPv6）' "$ROOT/scripts/media.sh"
 grep -q 'IP 质量体检（仅 IPv4）' "$ROOT/scripts/media.sh"
 grep -q 'IP 质量体检（仅 IPv6）' "$ROOT/scripts/media.sh"
 grep -q 'https://check.unlock.media' "$ROOT/scripts/media.sh"
+grep -q 'curl -L -sS --retry 2 --retry-delay 2' "$ROOT/scripts/media.sh"
+! grep -q 'run_remote_bash "$MEDIA_CHECK_URL"' "$ROOT/scripts/media.sh"
 
-printf 'IPQuality 快捷入口测试通过。\n'
+printf 'IPQuality / 流媒体入口测试通过。\n'
