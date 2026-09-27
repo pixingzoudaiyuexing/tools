@@ -8,8 +8,13 @@ docker_status_header() {
         images="$(docker image ls -q 2>/dev/null | sort -u | awk 'NF {n++} END {print n+0}')"
         printf 'Docker 状态：%s\n' "$(docker info >/dev/null 2>&1 && printf '运行中' || printf '不可用')"
         printf 'Docker 版本：%s\n' "$(docker version --format '{{.Server.Version}}' 2>/dev/null || docker --version 2>/dev/null || printf '未知')"
+        if docker compose version >/dev/null 2>&1; then
+            printf 'Compose 版本：%s\n' "$(docker compose version --short 2>/dev/null || docker compose version 2>/dev/null || printf '未知')"
+        else
+            printf 'Compose 版本：未安装\n'
+        fi
     else
-        printf 'Docker 状态：未安装\nDocker 版本：-\n'
+        printf 'Docker 状态：未安装\nDocker 版本：-\nCompose 版本：-\n'
     fi
     printf '容器数量：%s（运行 %s）\n镜像数量：%s\n\n' "$total" "$running" "$images"
 }
@@ -28,7 +33,7 @@ docker_select_container() {
     else
         mapfile -t containers < <(docker ps -a --format '{{.Names}}')
     fi
-    ((${#containers[@]} > 0)) || { warn "没有可选容器。"; return 1; }
+    (("${#containers[@]}" > 0)) || { warn "没有可选容器。"; return 1; }
     for i in "${!containers[@]}"; do printf '%d. %s\n' "$((i + 1))" "${containers[$i]}" >&2; done
     read -r -p "请选择容器编号: " choice
     [[ "$choice" =~ ^[0-9]+$ ]] || { error "编号无效。"; return 1; }
@@ -41,7 +46,7 @@ docker_select_image() {
     local choice choice_number i selected
     local images=()
     mapfile -t images < <(docker image ls --format '{{.Repository}}:{{.Tag}}|{{.ID}}')
-    ((${#images[@]} > 0)) || { warn "没有可选镜像。"; return 1; }
+    (("${#images[@]}" > 0)) || { warn "没有可选镜像。"; return 1; }
     for i in "${!images[@]}"; do printf '%d. %s\n' "$((i + 1))" "${images[$i]%%|*}" >&2; done
     read -r -p "请选择镜像编号: " choice
     [[ "$choice" =~ ^[0-9]+$ ]] || { error "编号无效。"; return 1; }
@@ -84,7 +89,7 @@ docker_all_action() {
         running) mapfile -t ids < <(docker ps -q) ;;
         stopped) mapfile -t ids < <(docker ps -aq --filter status=exited --filter status=created) ;;
     esac
-    ((${#ids[@]} > 0)) || { info "没有符合条件的容器。"; return 0; }
+    (("${#ids[@]}" > 0)) || { info "没有符合条件的容器。"; return 0; }
     [[ -z "$prompt" ]] || confirm "$prompt" || return 0
     if [[ "$action" == "rm" ]]; then
         docker rm -f "${ids[@]}"
@@ -102,22 +107,62 @@ docker_remove_image() {
 docker_remove_all_images() {
     local ids=()
     mapfile -t ids < <(docker image ls -q | sort -u)
-    ((${#ids[@]} > 0)) || { info "没有镜像。"; return 0; }
+    (("${#ids[@]}" > 0)) || { info "没有镜像。"; return 0; }
     confirm "确认删除所有可删除镜像？正在被容器使用的镜像会保留。" || return 0
     docker image rm "${ids[@]}" || warn "部分镜像正在使用，未被删除。"
+}
+
+docker_ensure_compose_v2() {
+    if docker_compose_available; then
+        success "Docker Compose V2 已可用：$(docker compose version --short 2>/dev/null || docker compose version)"
+        return 0
+    fi
+
+    info "未检测到 Docker Compose V2，正在安装 docker-compose-plugin..."
+    if command_exists apt-get; then
+        DEBIAN_FRONTEND=noninteractive apt-get update || { error "apt-get update 失败。"; return 1; }
+        DEBIAN_FRONTEND=noninteractive apt-get install -y docker-compose-plugin || {
+            error "docker-compose-plugin 安装失败。"
+            return 1
+        }
+    elif command_exists dnf; then
+        dnf install -y docker-compose-plugin || { error "docker-compose-plugin 安装失败。"; return 1; }
+    elif command_exists yum; then
+        yum install -y docker-compose-plugin || { error "docker-compose-plugin 安装失败。"; return 1; }
+    else
+        error "未找到可支持的包管理器，无法自动补装 Docker Compose V2。"
+        return 1
+    fi
+
+    docker_compose_available || {
+        error "Docker Compose V2 安装后仍不可用。"
+        return 1
+    }
+    success "Docker Compose V2 安装完成：$(docker compose version --short 2>/dev/null || docker compose version)"
 }
 
 docker_official_install() {
     local script
     require_root || return 1
-    if command_exists docker; then info "Docker 已安装。"; return 0; fi
-    confirm "使用 Docker 官方 get.docker.com 安装脚本？" || return 0
-    script="$(mktemp)" || return 1
-    download_file "https://get.docker.com" "$script" || { rm -f "$script"; return 1; }
-    sh "$script" || { rm -f "$script"; return 1; }
-    rm -f "$script"
-    systemctl enable --now docker
-    docker version
+
+    if command_exists docker; then
+        info "Docker 已安装，将检查 Docker 服务与 Compose V2。"
+    else
+        confirm "使用 Docker 官方 get.docker.com 安装脚本？" || return 0
+        script="$(mktemp)" || return 1
+        download_file "https://get.docker.com" "$script" || { rm -f "$script"; return 1; }
+        sh "$script" || { rm -f "$script"; return 1; }
+        rm -f "$script"
+    fi
+
+    if command_exists systemctl; then
+        systemctl enable --now docker || { error "Docker 服务启动失败。"; return 1; }
+    fi
+
+    docker version || { error "Docker Engine 验证失败。"; return 1; }
+    docker_ensure_compose_v2 || return 1
+    docker compose version || { error "Docker Compose V2 验证失败。"; return 1; }
+    success "Docker Engine + Docker Compose V2 均已可用。"
 }
 
 docker_linuxmirrors() {
@@ -164,7 +209,7 @@ module_main() {
 16. 查看 Docker 磁盘占用
 
 [安装 / 维护]
-17. 官方方式安装 Docker
+17. 官方方式安装 Docker + Compose V2
 18. LinuxMirrors 安装 Docker
 19. Docker 镜像源管理
  0. 返回
