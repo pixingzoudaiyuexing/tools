@@ -23,6 +23,29 @@ run_ipquality() {
     return "$status"
 }
 
+run_media_check() {
+    local temp_file status
+    ensure_download_environment || return 1
+    temp_file="$(mktemp)" || { error "无法创建临时文件。"; return 1; }
+
+    info "即将按上游官方入口加载最新版：lmc999/RegionRestrictionCheck"
+    if ! curl -L -sS --retry 2 --retry-delay 2 -o "$temp_file" "$MEDIA_CHECK_URL"; then
+        error "流媒体检测脚本下载失败：$MEDIA_CHECK_URL"
+        rm -f "$temp_file"
+        return 1
+    fi
+    if [[ ! -s "$temp_file" ]]; then
+        error "流媒体检测脚本下载内容为空：$MEDIA_CHECK_URL"
+        rm -f "$temp_file"
+        return 1
+    fi
+
+    bash "$temp_file"
+    status=$?
+    rm -f "$temp_file"
+    return "$status"
+}
+
 module_main() {
     local choice
     while true; do
@@ -37,7 +60,7 @@ module_main() {
 说明：
 - IP 质量体检使用 xykt/IPQuality（IP.Check.Place）。
 - 默认双栈检测；也可强制只检测 IPv4 或 IPv6。
-- 原有 lmc999/RegionRestrictionCheck 入口继续保留。
+- 流媒体检测每次按 lmc999/RegionRestrictionCheck 官方入口实时拉取最新版。
 TEXT
         printf '\n'
         read -r -p "请选择: " choice
@@ -45,7 +68,7 @@ TEXT
             1) run_ipquality; pause ;;
             2) run_ipquality -4; pause ;;
             3) run_ipquality -6; pause ;;
-            4) run_remote_bash "$MEDIA_CHECK_URL" "lmc999/RegionRestrictionCheck"; pause ;;
+            4) run_media_check; pause ;;
             0) return 0 ;;
             *) warn "无效选项。"; pause ;;
         esac
