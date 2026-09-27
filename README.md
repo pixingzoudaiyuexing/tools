@@ -63,7 +63,7 @@ tools
 - DDNS-GO：Cloudflare、华为云、阿里云、DNSPod，A/AAAA 可分别启用，本地 `-noweb` 服务。
 - 3proxy Docker：带认证的 HTTP / SOCKS5 代理安装、修改、启停、升级和卸载。
 - BBR / BBRv3：12 号菜单提供“快速开启 BBR + FQ”，选择后直接使用当前内核已有 BBR 自动设置 `net.ipv4.tcp_congestion_control=bbr` 和 `net.core.default_qdisc=fq`，写入独立 sysctl 持久化配置并验证状态，不需要再进入上游分级菜单；若当前内核没有 BBR，则提示使用保留的 Actions-bbr-v3 完整管理脚本。
-- 流媒体解锁、TikTok 地区检测入口。
+- 流媒体 / 地区解锁检测：IPQuality 入口保留；RegionRestrictionCheck 每次按 `check.unlock.media` 上游官方入口实时拉取最新版，不再套用工具箱通用的 10 秒连接超时。\n- AI 服务检测：单独入口调用 `adsorgcn/vpscheck` 最新版的 AI-only 模式，覆盖 ChatGPT / OpenAI API / Gemini / Claude / Copilot / Grok / Perplexity / DeepSeek / Kimi 等。\n- TikTok 地区检测入口。
 - 樱花 VPS Debian 12 预置 IPv6 精确启用和验证。
 - 樱花 VPS 基础环境修复：`apt-get update`、重新安装 `openssl` / `ca-certificates`、安装 `curl` / `wget` 并刷新 CA 证书。
 
@@ -75,14 +75,14 @@ tools
 - Root SSH 密码登录：仅写入 `/etc/ssh/sshd_config.d/00-vps-tools-root.conf`，修改前后执行 `sshd -t` 并验证实际生效配置。
 - Root 临时 Ed25519 密钥：1 小时、6 小时、24 小时、7 天或永久，systemd timer 负责真正到期失效。
 - bin456789/reinstall 系统重装入口。
-- 服务器首次启动时间检测：24 号菜单直接执行只读诊断，汇总当前启动、systemd boot 历史、最早 Journal、wtmp/reboot、根文件系统创建时间、Cloud-init 首次/历史记录、云厂商数据源、Instance ID 和 machine-id 时间；综合判断优先参考 Cloud-init，并自动给出北京时间。快照、克隆、自定义镜像或迁移可能使该时间早于当前实例实际购买时间。
+- 服务器首次启动时间检测：25 号菜单直接执行只读诊断，汇总当前启动、systemd boot 历史、最早 Journal、wtmp/reboot、根文件系统创建时间、Cloud-init 首次/历史记录、云厂商数据源、Instance ID 和 machine-id 时间；综合判断优先参考 Cloud-init，并自动给出北京时间。快照、克隆、自定义镜像或迁移可能使该时间早于当前实例实际购买时间。
 
 ### Docker
 
 - 容器列表、日志、启停、重启和删除，单个对象均通过编号选择。
 - 镜像列表和删除。
 - Docker 服务状态、重启和磁盘占用。
-- Docker 官方安装、LinuxMirrors 安装和 `--only-registry` 镜像源管理。
+- Docker 官方安装会同时检查并确保 Docker Compose V2（`docker compose`）可用；缺失时自动补装 `docker-compose-plugin`，并验证 Engine + Compose。另保留 LinuxMirrors 安装和 `--only-registry` 镜像源管理。
 - 不提供 `docker system prune -a`。
 
 ## 支持系统
@@ -130,7 +130,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/pixingzoudaiyuexing/tools/ma
 - [jeessy2/ddns-go](https://github.com/jeessy2/ddns-go)：DDNS 核心和服务商 API。
 - [tarampampam/3proxy-docker](https://github.com/tarampampam/3proxy-docker)：3proxy 容器镜像。
 - [byJoey/Actions-bbr-v3](https://github.com/byJoey/Actions-bbr-v3)：BBRv3 内核和网络优化。
-- [lmc999/RegionRestrictionCheck](https://github.com/lmc999/RegionRestrictionCheck)：流媒体解锁检测。
+- [xykt/IPQuality](https://github.com/xykt/IPQuality)：IP 质量体检。\n- [lmc999/RegionRestrictionCheck](https://github.com/lmc999/RegionRestrictionCheck)：流媒体解锁检测，每次运行实时使用上游入口。\n- [adsorgcn/vpscheck](https://github.com/adsorgcn/vpscheck)：AI 服务可用性检测，工具箱仅调用其 AI-only 模式。
 - [lmc999/TikTokCheck](https://github.com/lmc999/TikTokCheck)：TikTok 地区检测。
 - [SuperManito/LinuxMirrors](https://github.com/SuperManito/LinuxMirrors)：系统源和 Docker 安装/镜像源。
 - [SideCloudGroup/AppleAutoPro-Backend](https://github.com/SideCloudGroup/AppleAutoPro-Backend)：AppleID v4 后端。
