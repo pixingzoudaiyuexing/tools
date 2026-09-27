@@ -186,23 +186,24 @@ main_menu() {
 11. HTTP / SOCKS5 代理
 12. BBR / BBRv3 网络优化
 13. 流媒体 / 地区解锁检测
-14. TikTok 地区检测
-15. 樱花 VPS IPv6 启用
-16. 樱花 VPS 基础环境修复（curl / wget / CA）
+14. AI 服务检测
+15. TikTok 地区检测
+16. 樱花 VPS IPv6 启用
+17. 樱花 VPS 基础环境修复（curl / wget / CA）
 
 [系统工具]
-17. Linux 系统换源
-18. Swap 管理
-19. 时间 / 时区管理
-20. Root SSH 管理
-21. 临时 SSH 密钥管理
-22. VPS 系统重装
+18. Linux 系统换源
+19. Swap 管理
+20. 时间 / 时区管理
+21. Root SSH 管理
+22. 临时 SSH 密钥管理
+23. VPS 系统重装
 
 [Docker]
-23. Docker 管理
+24. Docker 管理
 
 [诊断]
-24. 服务器首次启动时间检测
+25. 服务器首次启动时间检测
 
 [工具箱]
 98. 安装 tools 快捷命令
@@ -225,17 +226,18 @@ MENU
             11) load_module proxy ;;
             12) load_module bbr ;;
             13) load_module media ;;
-            14) load_module tiktok ;;
-            15) load_module sakura-ipv6 ;;
-            16) load_module sakura-env ;;
-            17) load_module mirrors ;;
-            18) load_module swap ;;
-            19) load_module time ;;
-            20) load_module root-ssh ;;
-            21) load_module temp-ssh-key ;;
-            22) load_module reinstall ;;
-            23) load_module docker ;;
-            24) load_module server-birth ;;
+            14) load_module ai-check ;;
+            15) load_module tiktok ;;
+            16) load_module sakura-ipv6 ;;
+            17) load_module sakura-env ;;
+            18) load_module mirrors ;;
+            19) load_module swap ;;
+            20) load_module time ;;
+            21) load_module root-ssh ;;
+            22) load_module temp-ssh-key ;;
+            23) load_module reinstall ;;
+            24) load_module docker ;;
+            25) load_module server-birth ;;
             98) install_shortcut; pause ;;
             99) show_info ;;
             0) success "已退出。"; return 0 ;;
